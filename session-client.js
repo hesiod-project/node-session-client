@@ -1,8 +1,15 @@
-const libsignal     = require('libsignal')
+const fs     = require('fs')
+const crypto = require('crypto')
 const EventEmitter  = require('events')
-const lib = require('./lib/lib.js')
+const libsignal     = require('libsignal')
 
+const lib = require('./lib/lib.js')
+const attachemntUtils = require('./lib/attachments.js')
+const loki_crypto = require('./lib/lib.loki_crypt.js')
+const protobuf = require('./lib/protobuf.js')
 const keyUtil = require('./external/mnemonic/index.js')
+
+const FILESERVER_URL = 'https://file.getsession.org/' // path required!
 
 class SessionClient extends EventEmitter {
   // options.seed
@@ -35,6 +42,43 @@ class SessionClient extends EventEmitter {
     // process keypair
     this.keypair = options.keypair
     this.ourPubkeyHex = options.keypair.pubKey.toString('hex')
+    // we need ourPubkeyHex set
+    if (options.avatarFile) {
+      if (fs.existsSync(options.avatarFile)) {
+        let avatarOk = false
+        const avatarDisk = fs.readFileSync(options.avatarFile)
+        // is this image uploaded to the server?
+        const avatarRes = await attachemntUtils.getAvatar(FILESERVER_URL,
+          this.ourPubkeyHex
+        )
+        if (!avatarRes) {
+          console.warn('SessionClient::loadIdentity - getAvatar failure', avatarRes)
+        } else {
+          this.encAvatarUrl = avatarRes.url
+          this.profileKeyBuf = Buffer.from(avatarRes.profileKey64, 'base64')
+          const netData = await attachemntUtils.downloadEncryptedAvatar(
+            this.encAvatarUrl, this.profileKeyBuf
+          )
+          if (!netData) {
+            console.warn('SessionClient::loadIdentity - downloadEncryptedAvatar failure', netData)
+          } else {
+            if (avatarDisk.byteLength !== netData.byteLength ||
+                Buffer.compare(avatarDisk, netData) !== 0) {
+              console.log('SessionClient::loadIdentity - detected avatar change, replacing')
+              await this.changeAvatar(avatarDisk)
+            } else {
+              avatarOk = true
+            }
+          }
+        }
+        if (!avatarOk) {
+          console.log('SessionClient::loadIdentity - unable to read avatar state, resetting avatar')
+          await this.changeAvatar(avatarDisk)
+        }
+      } else {
+        console.error('SessionClient::loadIdentity - avatarFile', options.avatarFile, 'is not found')
+      }
+    }
   }
 
   async open() {
@@ -66,7 +110,23 @@ class SessionClient extends EventEmitter {
       }
       if (result.messages.length) {
         // emit them...
-        this.emit('messages', result.messages)
+        const messages = []
+        result.messages.forEach(msg => {
+          if (msg.dataMessage && (msg.dataMessage.body || msg.dataMessage.attachments)) {
+            messages.push(msg.dataMessage)
+          } else
+          if (msg.preKeyBundleMessage) {
+            this.emit('preKeyBundle', msg)
+          } else
+          if (msg.receiptMessage) {
+            this.emit('receiptMessage', msg)
+          } else {
+            console.log('poll - unhandled message', msg)
+          }
+        })
+        if (messages.length) {
+          this.emit('messages', messages)
+        }
       }
     }
     setTimeout(() => {
@@ -74,6 +134,88 @@ class SessionClient extends EventEmitter {
         this.poll()
       }
     }, this.pollRate)
+  }
+
+  // get and decrypt all attachments
+  getAttachments(msg) {
+/*
+attachment AttachmentPointer {
+  id: Long { low: 159993, high: 0, unsigned: true },
+  contentType: 'image/jpeg',
+  key: Uint8Array(64) [
+    132, 169, 117,  10, 194,  47, 216,  60,  27,   1, 227,
+     49,  16, 116, 170,  67,  89, 135, 139,  11,  75,  54,
+    130, 184,  16, 174, 252,  26, 164, 251, 114, 244,  37,
+    180,  52, 139, 149, 108,  60,  16,  63, 154, 161,  80,
+     85, 198,  90, 116,  56, 214, 212, 111, 156,  55, 221,
+     44,  39, 202,  46,   4, 190, 169, 193,  26
+  ],
+  size: 6993,
+  digest: Uint8Array(32) [
+    193,  15, 127,  86,  79,   0, 239, 104,
+    202, 189,  49, 238,  79, 192, 119, 168,
+    221, 223, 237,  30, 171, 191,  48, 181,
+     94,   6,   7, 155, 209, 116,  84, 171
+  ],
+  fileName: 'images.jpeg',
+  url: 'https://file-static.lokinet.org/f/ciebnq'
+}
+*/
+    return Promise.all(msg.attachments.map(async attachment => {
+      // attachment.key
+      const res = await attachemntUtils.downloadEncryptedAttachment(attachment.url, attachment.key)
+      //console.log('attachmentRes', res)
+      return res
+    }))
+  }
+
+  async ensureFileServerToken() {
+    if (!this.fileServerToken) {
+      // we need a token...
+      this.fileServerToken = await attachemntUtils.getToken(
+        FILESERVER_URL, this.keypair.privKey, this.ourPubkeyHex
+      )
+      this.emit('fileServerToken', this.fileServerToken)
+    }
+    // else maybe verify token
+  }
+
+  async changeAvatar(data) {
+    if (!this.ourPubkeyHex) {
+      console.error('SessionClient::changeAvatar - Identity not set up yet')
+      return
+    }
+    const sessionID = this.ourPubkeyHex
+    await this.ensureFileServerToken()
+    const res = await attachemntUtils.uploadEncryptedAvatar(
+      FILESERVER_URL, this.fileServerToken, this.ourPubkeyHex, data)
+    //console.log('SessionClient::changeAvatar - res', res)
+    /* profileKeyBuf: buffer
+      url: string */
+
+    // update our state
+    this.encAvatarUrl = res.url
+    this.profileKeyBuf = res.profileKeyBuf
+
+    return res
+  }
+
+  async makeAttachment(data) {
+    // encrypt data
+    const aesKey = crypto.randomBytes(32)
+    const encryptedBin = loki_crypto.encryptCBC(aesKey, data)
+    // upload data to file server
+    const url = await attachemntUtils.uploadFile(FILESERVER_URL, 'loki', 'org.getsession.attachment', 'images.jpeg', encryptedBin)
+    // get key, url, size... make digest?
+    // FIXME: calculate MAC
+    // FIXME: calculate digest (sha256)
+    return protobuf.AttachmentPointer.create({
+      key: aesKey,
+      contentType: 'image/jpeg',
+      url: url,
+      fileName: 'images.jpeg',
+      size: encryptedBin.byteLength,
+    })
   }
 
   close() {
@@ -86,9 +228,15 @@ class SessionClient extends EventEmitter {
     if (!this.sendLib) {
       this.sendLib = require('./lib/send.js')
     }
-    return this.sendLib.send(destination, this.keypair, messageTextBody, lib, {
-      displayName: this.displayName
-    })
+    const sendOptions = {...options}
+    if (this.displayName) sendOptions.displayName = this.displayName
+    if (this.encAvatarUrl && this.profileKeyBuf) {
+      sendOptions.avatar = {
+        url: this.encAvatarUrl,
+        profileKeyBuf: this.profileKeyBuf
+      }
+    }
+    return this.sendLib.send(destination, this.keypair, messageTextBody, lib, sendOptions)
   }
 }
 
