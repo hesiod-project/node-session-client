@@ -1,10 +1,10 @@
 const fs     = require('fs')
 const crypto = require('crypto')
 const EventEmitter  = require('events')
-const libsignal     = require('libsignal')
 
 const lib = require('./lib/lib.js')
 const attachemntUtils = require('./lib/attachments.js')
+// eslint-disable-next-line camelcase
 const loki_crypto = require('./lib/lib.loki_crypt.js')
 const protobuf = require('./lib/protobuf.js')
 const keyUtil = require('./external/mnemonic/index.js')
@@ -138,29 +138,29 @@ class SessionClient extends EventEmitter {
 
   // get and decrypt all attachments
   getAttachments(msg) {
-/*
-attachment AttachmentPointer {
-  id: Long { low: 159993, high: 0, unsigned: true },
-  contentType: 'image/jpeg',
-  key: Uint8Array(64) [
-    132, 169, 117,  10, 194,  47, 216,  60,  27,   1, 227,
-     49,  16, 116, 170,  67,  89, 135, 139,  11,  75,  54,
-    130, 184,  16, 174, 252,  26, 164, 251, 114, 244,  37,
-    180,  52, 139, 149, 108,  60,  16,  63, 154, 161,  80,
-     85, 198,  90, 116,  56, 214, 212, 111, 156,  55, 221,
-     44,  39, 202,  46,   4, 190, 169, 193,  26
-  ],
-  size: 6993,
-  digest: Uint8Array(32) [
-    193,  15, 127,  86,  79,   0, 239, 104,
-    202, 189,  49, 238,  79, 192, 119, 168,
-    221, 223, 237,  30, 171, 191,  48, 181,
-     94,   6,   7, 155, 209, 116,  84, 171
-  ],
-  fileName: 'images.jpeg',
-  url: 'https://file-static.lokinet.org/f/ciebnq'
-}
-*/
+    /*
+    attachment AttachmentPointer {
+      id: Long { low: 159993, high: 0, unsigned: true },
+      contentType: 'image/jpeg',
+      key: Uint8Array(64) [
+        132, 169, 117,  10, 194,  47, 216,  60,  27,   1, 227,
+         49,  16, 116, 170,  67,  89, 135, 139,  11,  75,  54,
+        130, 184,  16, 174, 252,  26, 164, 251, 114, 244,  37,
+        180,  52, 139, 149, 108,  60,  16,  63, 154, 161,  80,
+         85, 198,  90, 116,  56, 214, 212, 111, 156,  55, 221,
+         44,  39, 202,  46,   4, 190, 169, 193,  26
+      ],
+      size: 6993,
+      digest: Uint8Array(32) [
+        193,  15, 127,  86,  79,   0, 239, 104,
+        202, 189,  49, 238,  79, 192, 119, 168,
+        221, 223, 237,  30, 171, 191,  48, 181,
+         94,   6,   7, 155, 209, 116,  84, 171
+      ],
+      fileName: 'images.jpeg',
+      url: 'https://file-static.lokinet.org/f/ciebnq'
+    }
+    */
     return Promise.all(msg.attachments.map(async attachment => {
       // attachment.key
       const res = await attachemntUtils.downloadEncryptedAttachment(attachment.url, attachment.key)
@@ -185,7 +185,6 @@ attachment AttachmentPointer {
       console.error('SessionClient::changeAvatar - Identity not set up yet')
       return
     }
-    const sessionID = this.ourPubkeyHex
     await this.ensureFileServerToken()
     const res = await attachemntUtils.uploadEncryptedAvatar(
       FILESERVER_URL, this.fileServerToken, this.ourPubkeyHex, data)
@@ -228,7 +227,7 @@ attachment AttachmentPointer {
     if (!this.sendLib) {
       this.sendLib = require('./lib/send.js')
     }
-    const sendOptions = {...options}
+    const sendOptions = { ...options }
     if (this.displayName) sendOptions.displayName = this.displayName
     if (this.encAvatarUrl && this.profileKeyBuf) {
       sendOptions.avatar = {

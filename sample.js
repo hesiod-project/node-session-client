@@ -3,10 +3,10 @@ const SessionClient = require('./session-client.js')
 
 const client = new SessionClient()
 client.loadIdentity({
-  seed: fs.existsSync('seed.txt') && fs.readFileSync('seed.txt').toString(),
+  seed: fs.existsSync('seed.txt') && fs.readFileSync('seed.txt').toString()
   //displayName: 'This is my name',
   //avatarFile: '5f16f4fd7ca8def05968bbca_Jk79urotkJJtMHZNO3kduoJLgAW6X6kgceEjnbI2VeeOseBujKs6ok_IbYl3OHxaaHLUmtMVRNk.png',
-}).then(async () => {
+}).then(async() => {
   client.open()
   client.on('messages', msgs => {
     msgs.forEach(async msg => {

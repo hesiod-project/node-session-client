@@ -15,6 +15,7 @@ module.exports = {
     'spaced-comment': 'off',
     'space-before-function-paren': ['error', 'never'],
     'no-var': 'error',
-    'no-constant-condition': 'off'
+    'no-constant-condition': 'off',
+    'comma-dangle': 'off',
   }
 }

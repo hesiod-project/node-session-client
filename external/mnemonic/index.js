@@ -2,9 +2,6 @@ const crypto   = require('crypto')
 const mnemonic = require('./mnemonic.js')
 const curve    = require('curve25519-n')
 
-const fromHexString = hexString =>
-  new Uint8Array(hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
-
 const SEEDSIZE = 16 // gives 12 seed words
 
 // words is a space separate string
@@ -14,7 +11,7 @@ function wordsToKeyPair(words) {
   // double it
   const seedHex64 = seedHex32.concat(seedHex32).substring(0, 64)
 
-  const priv1 = curve.makeSecretKey(Buffer.from(seedHex64, 'hex'));
+  const priv1 = curve.makeSecretKey(Buffer.from(seedHex64, 'hex'))
   const publicBuffer = Buffer.concat([Buffer.from('05', 'hex'), curve.derivePublicKey(priv1)])
 
   return {
@@ -35,5 +32,5 @@ async function newKeypair() {
 
 module.exports = {
   newKeypair,
-  wordsToKeyPair,
+  wordsToKeyPair
 }
