@@ -112,8 +112,10 @@ class SessionClient extends EventEmitter {
         // emit them...
         const messages = []
         result.messages.forEach(msg => {
+          // separate out simple messages to make it easier
           if (msg.dataMessage && (msg.dataMessage.body || msg.dataMessage.attachments)) {
-            messages.push(msg.dataMessage)
+            // escalate source
+            messages.push({ ...msg.dataMessage, source: msg.source })
           } else
           if (msg.preKeyBundleMessage) {
             this.emit('preKeyBundle', msg)
