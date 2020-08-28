@@ -1,12 +1,8 @@
 const fs     = require('fs')
-const crypto = require('crypto')
 const EventEmitter  = require('events')
 
 const lib = require('./lib/lib.js')
 const attachemntUtils = require('./lib/attachments.js')
-// eslint-disable-next-line camelcase
-const loki_crypto = require('./lib/lib.loki_crypt.js')
-const protobuf = require('./lib/protobuf.js')
 const keyUtil = require('./external/mnemonic/index.js')
 
 const FILESERVER_URL = 'https://file.getsession.org/' // path required!
@@ -165,10 +161,16 @@ class SessionClient extends EventEmitter {
     */
     return Promise.all(msg.attachments.map(async attachment => {
       // attachment.key
+      // could check digest too (should do that inside decryptCBC tho)
       const res = await attachemntUtils.downloadEncryptedAttachment(attachment.url, attachment.key)
       //console.log('attachmentRes', res)
       return res
     }))
+  }
+
+  async makeAttachment(data) {
+    const res = attachemntUtils.uploadEncryptedAttachment(FILESERVER_URL, data)
+    return res
   }
 
   async ensureFileServerToken() {
@@ -201,24 +203,6 @@ class SessionClient extends EventEmitter {
     return res
   }
 
-  async makeAttachment(data) {
-    // encrypt data
-    const aesKey = crypto.randomBytes(32)
-    const encryptedBin = loki_crypto.encryptCBC(aesKey, data)
-    // upload data to file server
-    const url = await attachemntUtils.uploadFile(FILESERVER_URL, 'loki', 'org.getsession.attachment', 'images.jpeg', encryptedBin)
-    // get key, url, size... make digest?
-    // FIXME: calculate MAC
-    // FIXME: calculate digest (sha256)
-    return protobuf.AttachmentPointer.create({
-      key: aesKey,
-      contentType: 'image/jpeg',
-      url: url,
-      fileName: 'images.jpeg',
-      size: encryptedBin.byteLength,
-    })
-  }
-
   close() {
     this.open = false
   }
@@ -238,6 +222,16 @@ class SessionClient extends EventEmitter {
       }
     }
     return this.sendLib.send(destination, this.keypair, messageTextBody, lib, sendOptions)
+  }
+
+  sendOpenGroupInvite(destination, serverName, serverAddress, channelId) {
+    return this.sendLib.send(destination, this.keypair, undefined, lib, {
+      groupInvitation: {
+        serverAddress: serverAddress,
+        channelId: channelId,
+        serverName: serverName
+      }
+    })
   }
 }
 
