@@ -24,12 +24,12 @@ class SessionClient extends EventEmitter {
     if (options.seed) {
       // decode seed into keypair
       options.keypair = keyUtil.wordsToKeyPair(options.seed)
-      console.log('Loaded SessionID', options.keypair.pubKey.toString('hex'), 'from seed words')
+      this.identityOutput = 'Loaded SessionID ' + options.keypair.pubKey.toString('hex') + 'from seed words'
     }
     // ensure keypair
     if (!options.keypair) {
       const res = await keyUtil.newKeypair()
-      console.log('SessionID', res.keypair.pubKey.toString('hex'), 'seed words:', res.words)
+      this.identityOutput = 'SessionID ' + res.keypair.pubKey.toString('hex') + ' seed words: ' + res.words
       options.keypair = res.keypair
     }
     if (options.displayName) {
@@ -96,6 +96,7 @@ class SessionClient extends EventEmitter {
   }
 
   async poll() {
+    //console.log('polling...')
     const result = await this.recvLib.checkBox(
       this.ourPubkeyHex, this.swarmUrl, this.keypair, this.lastHash, lib
     )
@@ -108,16 +109,26 @@ class SessionClient extends EventEmitter {
         // emit them...
         const messages = []
         result.messages.forEach(msg => {
+          //console.log('poll -', msg)
           // separate out simple messages to make it easier
           if (msg.dataMessage && (msg.dataMessage.body || msg.dataMessage.attachments)) {
-            // escalate source
-            messages.push({ ...msg.dataMessage, source: msg.source })
+            // maybe there will be something here...
+            //console.log('pool dataMessage', msg)
+            // skip session resets
+            // desktop: msg.dataMessage.body === 'TERMINATE' &&
+            if (!(msg.flags === 1)) { // END_SESSION
+              // escalate source
+              messages.push({ ...msg.dataMessage, source: msg.source })
+            }
           } else
           if (msg.preKeyBundleMessage) {
             this.emit('preKeyBundle', msg)
           } else
           if (msg.receiptMessage) {
             this.emit('receiptMessage', msg)
+          } else
+          if (msg.nullMessage) {
+            this.emit('nullMessage', msg)
           } else {
             console.log('poll - unhandled message', msg)
           }
@@ -224,6 +235,7 @@ class SessionClient extends EventEmitter {
     return this.sendLib.send(destination, this.keypair, messageTextBody, lib, sendOptions)
   }
 
+  // works on desktop not on iOS/Android
   sendOpenGroupInvite(destination, serverName, serverAddress, channelId) {
     return this.sendLib.send(destination, this.keypair, undefined, lib, {
       groupInvitation: {
@@ -231,6 +243,18 @@ class SessionClient extends EventEmitter {
         channelId: channelId,
         serverName: serverName
       }
+    })
+  }
+
+  sendSessionReset(destination) {
+    return this.sendLib.send(destination, this.keypair, 'TERMINATE', lib, {
+      flags: 1
+    })
+  }
+
+  sendSessionEstablished(destination) {
+    return this.sendLib.send(destination, this.keypair, '', lib, {
+      nullMessage: true
     })
   }
 }
