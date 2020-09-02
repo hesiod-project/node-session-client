@@ -51,7 +51,7 @@ client.loadIdentity({
   // Send message example
   //
   // need an image
-  //const attachment = await client.makeAttachment(fs.readFileSync('/Users/user2/Pictures/1587699732-0s.png'))
+  //const attachment = await client.makeImageAttachment(fs.readFileSync('/Users/user2/Pictures/1587699732-0s.png'))
   client.send(toPubkey, 'Hello', {
     // attachments: [attachment]
   })
