@@ -35,7 +35,7 @@ const FILESERVER_URL = 'https://file.getsession.org/' // path required!
 class SessionClient extends EventEmitter {
   /**
    * @constructor
-   * @param {Object} [options] Creation client options
+   * @param {object} [options] Creation client options
    * @param {Number} [options.pollRate] How much delay between poll requests, Defaults: 1000
    * @param {Number} [options.lastHash] lastHash Poll for messages from this hash on Defaults: '' (Read all messages)
    * @param {Number} [options.homeServer] Which server holds your profile and attachments Defaults: https://file.getsession.org/
@@ -50,6 +50,7 @@ class SessionClient extends EventEmitter {
     this.homeServer = options.homeServer || FILESERVER_URL
     this.fileServerToken = options.fileServerToken || ''
     this.displayName = options.displayName || false
+    this.pollServer = false
   }
 
   // maybe a setName option
@@ -80,7 +81,7 @@ class SessionClient extends EventEmitter {
     if (options.seed) {
       // decode seed into keypair
       options.keypair = keyUtil.wordsToKeyPair(options.seed)
-      this.identityOutput = 'Loaded SessionID ' + options.keypair.pubKey.toString('hex') + 'from seed words'
+      this.identityOutput = 'Loaded SessionID ' + options.keypair.pubKey.toString('hex') + ' from seed words'
     }
     // ensure keypair
     if (!options.keypair) {
@@ -155,7 +156,7 @@ class SessionClient extends EventEmitter {
        */
       this.recvLib = require('./lib/recv.js')
     }
-    this.open = true
+    this.pollServer = true
     // start polling our box
     this.poll()
   }
@@ -173,7 +174,7 @@ class SessionClient extends EventEmitter {
   async poll() {
     if (this.debugTimer) console.log('polling...')
     const result = await this.recvLib.checkBox(
-      this.ourPubkeyHex, this.swarmUrl, this.keypair, this.lastHash, lib
+      this.ourPubkeyHex, this.swarmUrl, this.keypair, this.lastHash, lib, this.debugTimer
     )
     if (this.debugTimer) console.log('polled...')
     if (result) {
@@ -259,7 +260,7 @@ class SessionClient extends EventEmitter {
     if (this.debugTimer) console.log('scheduled...')
     setTimeout(() => {
       if (this.debugTimer) console.log('firing...')
-      if (this.open) {
+      if (this.pollServer) {
         if (this.debugTimer) console.log('calling...')
         this.poll()
       } else {
@@ -274,7 +275,7 @@ class SessionClient extends EventEmitter {
    */
   close() {
     if (this.debugTimer) console.log('closing')
-    this.open = false
+    this.pollServer = false
   }
 
   /**
