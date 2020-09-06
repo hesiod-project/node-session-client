@@ -174,7 +174,7 @@ class SessionClient extends EventEmitter {
   async poll() {
     if (this.debugTimer) console.log('polling...')
     const result = await this.recvLib.checkBox(
-      this.ourPubkeyHex, this.swarmUrl, this.keypair, this.lastHash, lib, this.debugTimer
+      this.ourPubkeyHex, this.keypair, this.lastHash, lib, this.debugTimer
     )
     if (this.debugTimer) console.log('polled...')
     if (result) {
