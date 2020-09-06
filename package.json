@@ -11,7 +11,7 @@
     "lint-fix": "node_modules/.bin/eslint . --fix --ext .js",
     "lint-full": "node_modules/.bin/eslint . --ext .js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "jsdoc": "jsdoc lib/lns.js session-client.js"
+    "jsdoc": "jsdoc -d docs lib/lns.js session-client.js"
   },
   "repository": {
     "type": "git",
