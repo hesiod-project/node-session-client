@@ -10,7 +10,7 @@ client.loadIdentity({
   seed: fs.existsSync('seed.txt') && fs.readFileSync('seed.txt').toString(),
   displayName: 'Sample Session Client',
   //avatarFile: 'avatar.png',
-}).then(async() => {
+}).then(async () => {
   console.log(client.identityOutput)
 
   // persist place in inbox incase we restart
@@ -38,7 +38,8 @@ client.loadIdentity({
       */
     })
   })
-  client.open()
+  // the await here allows send to reuse the cache it builds
+  await client.open()
 
   const toPubkey = '05d233c6c8daed63a48dfc872a6602512fd5a18fc764a6d75a08b9b25e7562851a'
 
