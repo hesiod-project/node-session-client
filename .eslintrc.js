@@ -13,9 +13,10 @@ module.exports = {
   rules: {
     'no-multi-spaces': 'off',
     'spaced-comment': 'off',
-    'space-before-function-paren': ['error', 'never'],
+    'space-before-function-paren': ['error', {anonymous: 'never', named: 'never', asyncArrow: 'always'}],
     'no-var': 'error',
     'no-constant-condition': 'off',
     'comma-dangle': 'off',
+    'object-curly-spacing': 'off',
   }
 }
