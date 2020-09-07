@@ -55,6 +55,7 @@ class SessionClient extends EventEmitter {
     this.pollServer = false
     this.groupInviteTextTemplate = '{pubKey} has invited you to join {name} at {url}'
     this.groupInviteNonC1TextTemplate = ' You may not be able to join this channel if you are using a mobile session client'
+    this.lastPoll = 0
   }
 
   // maybe a setName option
@@ -159,8 +160,30 @@ class SessionClient extends EventEmitter {
       this.recvLib = require('./lib/recv.js')
     }
     this.pollServer = true
+
     // start polling our box
-    this.poll()
+    await this.poll()
+    this.watchdog() // backup for production use
+  }
+
+  async watchdog() {
+    // if closed
+    if (!this.pollServer) {
+      return // don't reschedule
+    }
+    // make sure we've polled successfully at least once
+    if (this.lastPoll) {
+      const ago = Date.now() - this.lastPoll
+      // if you missed 10 polls in a roll
+      if (ago > this.pollRate * 10) {
+        console.warn('SessionClient::watchdog - polling failure, restarting poller')
+        this.poll()
+      }
+    }
+    // schedule us again
+    setTimeout(() => {
+      this.watchdog()
+    }, this.pollRate)
   }
 
   /**
@@ -173,6 +196,11 @@ class SessionClient extends EventEmitter {
    * @fires SessionClient#messages
    */
   async poll() {
+    // if closed
+    if (!this.pollServer) {
+      if (this.debugTimer) console.log('closed...')
+      return // don't reschedule
+    }
     if (this.debugTimer) console.log('polling...')
     const result = await this.recvLib.checkBox(
       this.ourPubkeyHex, this.keypair, this.lastHash, lib, this.debugTimer
@@ -258,15 +286,11 @@ class SessionClient extends EventEmitter {
         }
       }
     }
+    this.lastPoll = Date.now()
     if (this.debugTimer) console.log('scheduled...')
     setTimeout(() => {
       if (this.debugTimer) console.log('firing...')
-      if (this.pollServer) {
-        if (this.debugTimer) console.log('calling...')
-        this.poll()
-      } else {
-        if (this.debugTimer) console.log('closed...')
-      }
+      this.poll()
     }, this.pollRate)
   }
 
