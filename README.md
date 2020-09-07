@@ -24,3 +24,6 @@ Working on:
 
 Development depends on your support
 LT2mP2DrmGD82gFnH16ty8ZtP6f33czpA6XgQdnuTVeT5bNGyy3vnaUezzKq1rEYyq3cvb2GBZ5LjCC6uqDyKnbvFki9aAX
+
+QR Code:
+![LT2mP2DrmGD82gFnH16ty8ZtP6f33czpA6XgQdnuTVeT5bNGyy3vnaUezzKq1rEYyq3cvb2GBZ5LjCC6uqDyKnbvFki9aAX](LT2mP2DrmGD82gFnH16ty8ZtP6f33czpA6XgQdnuTVeT5bNGyy3vnaUezzKq1rEYyq3cvb2GBZ5LjCC6uqDyKnbvFki9aAX.png)
