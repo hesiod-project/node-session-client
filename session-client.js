@@ -25,6 +25,8 @@ const FILESERVER_URL = 'https://file.getsession.org/' // path required!
  * @property {String} ourPubkeyHex This identity's pubkey (SessionID)
  * @property {object} keypair This identity's keypair buffers
  * @property {Boolean} open Should we continue polling for messages
+ * @property {String} encAvatarUrl Encrypted avatar URL
+ * @property {Buffer} profileKeyBuf Key to decrypt avatar URL
  * @implements EventEmitter
  * @module session-client
  * @exports SessionClient
@@ -51,6 +53,8 @@ class SessionClient extends EventEmitter {
     this.fileServerToken = options.fileServerToken || ''
     this.displayName = options.displayName || false
     this.pollServer = false
+    this.groupInviteTextTemplate = '{pubKey} has invited you to join {name} at {url}'
+    this.groupInviteNonC1TextTemplate = ' You may not be able to join this channel if you are using a mobile session client'
   }
 
   // maybe a setName option
@@ -59,7 +63,6 @@ class SessionClient extends EventEmitter {
   /**
    * set an identity for this session client
    * sets this.identityOutput
-   * @async
    * @public
    * @param {Object} options a list of options of how to set up the identity
    * @param {string} [options.seed] a space separate list of seed words
@@ -136,7 +139,6 @@ class SessionClient extends EventEmitter {
 
   /**
    * start listening for messages
-   * @async
    * @public
    */
   async open() {
@@ -163,7 +165,6 @@ class SessionClient extends EventEmitter {
 
   /**
    * poll storage server for messages and emit events
-   * @async
    * @public
    * @fires SessionClient#updateLastHash
    * @fires SessionClient#preKeyBundle
@@ -280,12 +281,11 @@ class SessionClient extends EventEmitter {
 
   /**
    * get and decrypt all attachments
-   * @async
    * @public
    * @param {Object} message message to download attachments from
    * @return {Promise<Array>} an array of buffers of downloaded data
    */
-  getAttachments(msg) {
+  async getAttachments(msg) {
     /*
     attachment AttachmentPointer {
       id: Long { low: 159993, high: 0, unsigned: true },
@@ -320,7 +320,6 @@ class SessionClient extends EventEmitter {
 
   /**
    * get and decrypt all attachments
-   * @async
    * @public
    * @param {Buffer} data image data
    * @return {Promise<Object>} returns an attachmentPointer
@@ -331,7 +330,6 @@ class SessionClient extends EventEmitter {
 
   /**
    * get file server token for avatar operations
-   * @async
    * @private
    * @fires SessionClient#fileServerToken
    */
@@ -359,7 +357,6 @@ class SessionClient extends EventEmitter {
   /**
    * Change your avatar
    * @public
-   * @async
    * @param {Buffer} data image data
    * @return {Promise<object>} avatar's URL and profileKey to decode
    * @uses ensureFileServerToken
@@ -385,32 +382,29 @@ class SessionClient extends EventEmitter {
 
   /**
    * decode an avatar (usually from a message)
-   * @async
    * @public
    * @param {String} url Avatar URL
    * @param {Uint8Array} profileKeyUint8
    * @returns {Promise<Buffer>} a buffer containing raw binary data for image of avatar
    */
-  decodeAvatar(url, profileKeyUint8) {
+  async decodeAvatar(url, profileKeyUint8) {
     const buf = Buffer.from(profileKeyUint8)
     return attachemntUtils.downloadEncryptedAvatar(url, buf)
   }
 
   /**
    * get any one's avatar
-   * @async
    * @public
    * @param {String} url User's home server URL
    * @param {String} pubkeyHex Who's avatar you want
    * @returns {Promise<Buffer>} a buffer containing raw binary data for image of avatar
    */
-  getAvatar(fSrvUrl, pubkeyHex) {
+  async getAvatar(fSrvUrl, pubkeyHex) {
     return attachemntUtils.downloadEncryptedAvatar(fSrvUrl, pubkeyHex)
   }
 
   /**
    * Send a Session message
-   * @async
    * @public
    * @param {String} destination pubkey of who you want to send to
    * @param {String} [messageTextBody] text message to send
@@ -425,7 +419,7 @@ class SessionClient extends EventEmitter {
    * @example
    * sessionClient.send('05d233c6c8daed63a48dfc872a6602512fd5a18fc764a6d75a08b9b25e7562851a', 'I didn\'t change the pubkey')
    */
-  send(destination, messageTextBody, options = {}) {
+  async send(destination, messageTextBody, options = {}) {
     // lazy load recv library
     if (!this.sendLib) {
       this.sendLib = require('./lib/send.js')
@@ -444,7 +438,6 @@ class SessionClient extends EventEmitter {
   /**
    * Send an open group invite
    * Currently works on desktop not on iOS/Android
-   * @async
    * @public
    * @param {String} destination pubkey of who you want to send to
    * @param {String} serverName Server description
@@ -454,7 +447,7 @@ class SessionClient extends EventEmitter {
    * @example
    * sessionClient.sendOpenGroupInvite('05d233c6c8daed63a48dfc872a6602512fd5a18fc764a6d75a08b9b25e7562851a', 'Session Chat', 'https://chat.getsession.org/', 1)
    */
-  sendOpenGroupInvite(destination, serverName, serverAddress, channelId) {
+  async sendOpenGroupInvite(destination, serverName, serverAddress, channelId) {
     return this.sendLib.send(destination, this.keypair, undefined, lib, {
       groupInvitation: {
         serverAddress: serverAddress,
@@ -465,15 +458,39 @@ class SessionClient extends EventEmitter {
   }
 
   /**
+   * Send an open group invite with additional text for mobile
+   * @public
+   * @param {String} destination pubkey of who you want to send to
+   * @param {String} serverName Server description
+   * @param {String} serverAddress Server URL
+   * @param {Number} channelId Channel number
+   * @returns {Promise<Bool>} If operation was successful or not
+   * @example
+   * sessionClient.sendOpenGroupInvite('05d233c6c8daed63a48dfc872a6602512fd5a18fc764a6d75a08b9b25e7562851a', 'Session Chat', 'https://chat.getsession.org/', 1)
+   */
+  async sendSafeOpenGroupInvite(destination, serverName, serverAddress, channelId) {
+    // FIXME: maybe send a text with this
+    channelId = parseInt(channelId)
+    // this.groupInviteTextTemplate = '{pubKey} has invited you to join {name} at {url}'
+    let msg = this.groupInviteTextTemplate.replace(/{pubKey}/g, this.ourPubkeyHex)
+    msg = msg.replace(/{name}/g, serverName)
+    msg = msg.replace(/{url}/g, serverAddress)
+    if (channelId !== 1) {
+      msg += this.groupInviteNonC1TextTemplate
+    }
+    await this.send(destination, msg)
+    return this.sendOpenGroupInvite(destination, serverName, serverAddress, channelId)
+  }
+
+  /**
    * Request a session reset
-   * @async
    * @public
    * @param {String} destination pubkey of who you want to send to
    * @returns {Promise<Bool>} If operation was successful or not
    * @example
    * sessionClient.sendSessionReset('05d233c6c8daed63a48dfc872a6602512fd5a18fc764a6d75a08b9b25e7562851a')
    */
-  sendSessionReset(destination) {
+  async sendSessionReset(destination) {
     return this.sendLib.send(destination, this.keypair, 'TERMINATE', lib, {
       flags: 1
     })
@@ -481,14 +498,13 @@ class SessionClient extends EventEmitter {
 
   /**
    * Respond that session has been established
-   * @async
    * @public
    * @param {String} destination pubkey of who you want to send to
    * @returns {Promise<Bool>} If operation was successful or not
    * @example
    * sessionClient.sendSessionEstablished('05d233c6c8daed63a48dfc872a6602512fd5a18fc764a6d75a08b9b25e7562851a')
    */
-  sendSessionEstablished(destination) {
+  async sendSessionEstablished(destination) {
     return this.sendLib.send(destination, this.keypair, '', lib, {
       nullMessage: true
     })
