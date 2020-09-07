@@ -166,6 +166,10 @@ class SessionClient extends EventEmitter {
     this.watchdog() // backup for production use
   }
 
+  /**
+   * watch poller, and make sure it's running if it should be running
+   * @private
+   */
   async watchdog() {
     // if closed
     if (!this.pollServer) {
