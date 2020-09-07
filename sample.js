@@ -1,16 +1,25 @@
-const fs = require('fs')
+const fs = require('fs') // for loading state
+// may need to adjust path until npm version is available
 const SessionClient = require('./session-client.js')
 
+// create an instance
+// You'll want an instance per SessionID you want to receive messages for
 const client = new SessionClient()
+
 // load place in inbox if available
 if (fs.existsSync('lastHash.txt')) {
   client.lastHash = fs.readFileSync('lastHash.txt').toString()
 }
+
+// load an SessionID into client and set some options
 client.loadIdentity({
+  // load recovery phrase if available
   seed: fs.existsSync('seed.txt') && fs.readFileSync('seed.txt').toString(),
   displayName: 'Sample Session Client',
+  // path to local file
   //avatarFile: 'avatar.png',
 }).then(async () => {
+  // output recovery phrase if making an identity
   console.log(client.identityOutput)
 
   // persist place in inbox incase we restart
@@ -41,8 +50,8 @@ client.loadIdentity({
   // the await here allows send to reuse the cache it builds
   await client.open()
 
-  const toPubkey = '05d233c6c8daed63a48dfc872a6602512fd5a18fc764a6d75a08b9b25e7562851a'
-
+  // TODO: replace with your SessionID
+  const SessionID = '05d233c6c8daed63a48dfc872a6602512fd5a18fc764a6d75a08b9b25e7562851a'
   // LNS example
   //
   //const lnsUtils = require('./lib/lns.js')
@@ -53,7 +62,7 @@ client.loadIdentity({
   //
   // need an image
   //const attachment = await client.makeImageAttachment(fs.readFileSync('/Users/user2/Pictures/1587699732-0s.png'))
-  client.send(toPubkey, 'Hello', {
+  client.send(SessionID, 'Hello', {
     // attachments: [attachment]
   })
 
