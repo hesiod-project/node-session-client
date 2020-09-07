@@ -27,10 +27,17 @@ client.loadIdentity({
     fs.writeFileSync('lastHash.txt', hash)
   })
 
+  await client.joinOpenGroup('session.lokisn.com')
+
   // handle incoming messages
   client.on('messages', msgs => {
     msgs.forEach(async msg => {
-      //console.log('msg', msg)
+
+      console.log()
+      console.log(`New message, ${msg.openGroup ? `In group: ${msg.openGroup}` : 'Private'}:`)
+      console.log(`From: ${msg.profile.displayName} (${msg.source})`)
+      console.log(msg.body)
+
       // Attachment processing example
       /*
       if (msg.attachments.length) {
