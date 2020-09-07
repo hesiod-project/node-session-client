@@ -311,7 +311,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line46">line 46</a>
+        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line48">line 48</a>
     </li></ul></dd>
     
 
@@ -473,7 +473,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line367">line 367</a>
+        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line364">line 364</a>
     </li></ul></dd>
     
 
@@ -583,7 +583,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line276">line 276</a>
+        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line277">line 277</a>
     </li></ul></dd>
     
 
@@ -743,7 +743,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line394">line 394</a>
+        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line390">line 390</a>
     </li></ul></dd>
     
 
@@ -1084,7 +1084,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line407">line 407</a>
+        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line402">line 402</a>
     </li></ul></dd>
     
 
@@ -1476,7 +1476,7 @@ sets this.identityOutput
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line80">line 80</a>
+        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line83">line 83</a>
     </li></ul></dd>
     
 
@@ -1624,7 +1624,7 @@ sets this.identityOutput
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line328">line 328</a>
+        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line327">line 327</a>
     </li></ul></dd>
     
 
@@ -1734,7 +1734,7 @@ sets this.identityOutput
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line142">line 142</a>
+        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line144">line 144</a>
     </li></ul></dd>
     
 
@@ -1822,7 +1822,7 @@ sets this.identityOutput
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line174">line 174</a>
+        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line175">line 175</a>
     </li></ul></dd>
     
 
@@ -2274,7 +2274,7 @@ sets this.identityOutput
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line428">line 428</a>
+        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line422">line 422</a>
     </li></ul></dd>
     
 
@@ -2508,7 +2508,240 @@ Currently works on desktop not on iOS/Android
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line457">line 457</a>
+        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line450">line 450</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    If operation was successful or not
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;Bool></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>sessionClient.sendOpenGroupInvite('05d233c6c8daed63a48dfc872a6602512fd5a18fc764a6d75a08b9b25e7562851a', 'Session Chat', 'https://chat.getsession.org/', 1)</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="sendSafeOpenGroupInvite"><span class="type-signature">(async) </span>sendSafeOpenGroupInvite<span class="signature">(destination, serverName, serverAddress, channelId)</span><span class="type-signature"> &rarr; {Promise.&lt;Bool>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Send an open group invite with additional text for mobile
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>destination</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">pubkey of who you want to send to</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>serverName</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Server description</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>serverAddress</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Server URL</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>channelId</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Channel number</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line471">line 471</a>
     </li></ul></dd>
     
 
@@ -2672,7 +2905,7 @@ Currently works on desktop not on iOS/Android
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line491">line 491</a>
+        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line507">line 507</a>
     </li></ul></dd>
     
 
@@ -2836,7 +3069,7 @@ Currently works on desktop not on iOS/Android
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line476">line 476</a>
+        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line493">line 493</a>
     </li></ul></dd>
     
 
@@ -2915,7 +3148,7 @@ Currently works on desktop not on iOS/Android
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.5</a> on Sun Sep 06 2020 16:40:16 GMT-0700 (Pacific Daylight Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.5</a> on Sun Sep 06 2020 17:55:15 GMT-0700 (Pacific Daylight Time)
 </footer>
 
 <script> prettyPrint(); </script>
