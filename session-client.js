@@ -291,15 +291,18 @@ class SessionClient extends EventEmitter {
 
         if (groupResults.length) {
           groupResults.forEach(group => group.groupMessages.forEach(message => {
-            messages.push({
-              openGroup: group.openGroup,
-              body: message.text,
-              profile: {
-                displayName: message.user.name,
-                avatar: message.user.avatar_image.url,
-              },
-              source: message.user.username,
-            })
+            // Exclude our own messages
+            if (message.user.username !== this.ourPubkeyHex) {
+              messages.push({
+                openGroup: group.openGroup,
+                body: message.text,
+                profile: {
+                  displayName: message.user.name,
+                  avatar: message.user.avatar_image.url,
+                },
+                source: message.user.username,
+              })
+            }
           }))
         }
 
@@ -570,7 +573,7 @@ class SessionClient extends EventEmitter {
   /**
    * Join Open Group, Receive Open Group token
    * @public
-   * @param {String} open group URL (without protocl)
+   * @param {String} open group URL (without protocol)
    * @returns {Promise<Object>} Object {token: {String}, channelId: {Int}, lastMessageId: {Int}}
    * @example
    * sessionClient.joinOpenGroup('chat.getsession.org')
@@ -586,9 +589,24 @@ class SessionClient extends EventEmitter {
     const subscriptionResult = await openGroupUtils.subscribe(openGroup, this.openGroupServers[openGroup].token, this.openGroupServers[openGroup].channelId)
     this.openGroupServers[openGroup].lastMessageId = subscriptionResult && subscriptionResult.data && subscriptionResult.data.recent_message_id
 
-    return this.openGroupServers[openGroup];
+    return this.openGroupServers[openGroup]
   }
 
+  /**
+   * Send Open Group Message
+   * @public
+   * @param {String} open group URL (without protocol)
+   * @param {String} message text body
+   * @param {Object} additional options - not yet implemented
+   * @returns {Promise<Int>} ID of sent message, zero if not successfully sent
+   * @example
+   * sessionClient.joinOpenGroup('chat.getsession.org')
+   */
+  async sendOpenGroupMessage(openGroup, messageTextBody, options = {}) {
+    if (!this.openGroupServers[openGroup]) return false
+    const sendMessageResult = await openGroupUtils.send(openGroup, this.openGroupServers[openGroup].token, this.openGroupServers[openGroup].channelId, this.keypair.privKey, messageTextBody)
+    return sendMessageResult
+  }
 }
 
 module.exports = SessionClient

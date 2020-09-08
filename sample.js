@@ -27,12 +27,13 @@ client.loadIdentity({
     fs.writeFileSync('lastHash.txt', hash)
   })
 
-  await client.joinOpenGroup('session.lokisn.com')
+  const openGroupName = 'chat-dev.lokinet.org'
+
+  await client.joinOpenGroup(openGroupName)
 
   // handle incoming messages
   client.on('messages', msgs => {
     msgs.forEach(async msg => {
-
       console.log()
       console.log(`New message, ${msg.openGroup ? `In group: ${msg.openGroup}` : 'Private'}:`)
       console.log(`From: ${msg.profile.displayName} (${msg.source})`)
@@ -73,7 +74,9 @@ client.loadIdentity({
     // attachments: [attachment]
   })
 
+  await client.sendOpenGroupMessage(openGroupName, 'Sample Open Group Message')
+
   // Open group invite example
   // only works on desktop
-  //client.sendOpenGroupInvite(toPubkey, 'Bob\'s server', 'chat-dev.lokinet.org', 2)
+  //client.sendOpenGroupInvite(toPubkey, 'Bob\'s server', openGroupName, 2)
 })
