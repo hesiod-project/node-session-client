@@ -1,8 +1,9 @@
-const fs     = require('fs')
-const EventEmitter  = require('events')
+const fs = require('fs')
+const EventEmitter = require('events')
 
 const lib = require('./lib/lib.js')
 const attachemntUtils = require('./lib/attachments.js')
+const openGroupUtils = require('./lib/open_groups.js')
 const keyUtil = require('./external/mnemonic/index.js')
 
 /**
@@ -52,6 +53,7 @@ class SessionClient extends EventEmitter {
     this.homeServer = options.homeServer || FILESERVER_URL
     this.fileServerToken = options.fileServerToken || ''
     this.displayName = options.displayName || false
+    this.openGroupServers = {}
     this.pollServer = false
     this.groupInviteTextTemplate = '{pubKey} has invited you to join {name} at {url}'
     this.groupInviteNonC1TextTemplate = ' You may not be able to join this channel if you are using a mobile session client'
@@ -120,7 +122,7 @@ class SessionClient extends EventEmitter {
             console.warn('SessionClient::loadIdentity - downloadEncryptedAvatar failure', netData)
           } else {
             if (avatarDisk.byteLength !== netData.byteLength ||
-                Buffer.compare(avatarDisk, netData) !== 0) {
+              Buffer.compare(avatarDisk, netData) !== 0) {
               console.log('SessionClient::loadIdentity - detected avatar change, replacing')
               await this.changeAvatar(avatarDisk)
             } else {
@@ -206,74 +208,108 @@ class SessionClient extends EventEmitter {
       return // don't reschedule
     }
     if (this.debugTimer) console.log('polling...')
-    const result = await this.recvLib.checkBox(
+    const dmResult = await this.recvLib.checkBox(
       this.ourPubkeyHex, this.keypair, this.lastHash, lib, this.debugTimer
     )
+    const groupResults = (await Promise.all(Object.keys(this.openGroupServers).map(async (openGroup) => {
+      const groupMessages = await openGroupUtils.getMessages(
+        openGroup,
+        this.openGroupServers[openGroup].token,
+        this.openGroupServers[openGroup].channelId,
+        this.openGroupServers[openGroup].lastMessageId
+      )
+      if (groupMessages.length > 0) {
+        this.openGroupServers[openGroup].lastMessageId = groupMessages[0].id
+        return { openGroup, groupMessages }
+      } return undefined
+    }))).filter((m) => !!m)
+
     if (this.debugTimer) console.log('polled...')
-    if (result) {
-      if (result.lastHash !== this.lastHash) {
-        /**
-         * Handle when the cursor in the pubkey's inbox moves
-         * @callback updateLastHashCallback
-         * @param {String} hash The last hash returns from the storage server for this pubkey
-         */
-        /**
-         * Exposes the last hash, so you can persist between reloads where you left off
-         * and not process commands twice
-         * @event SessionClient#updateLastHash
-         * @type updateLastHashCallback
-         */
-        this.emit('updateLastHash', result.lastHash)
-        this.lastHash = result.lastHash
-      }
-      if (result.messages.length) {
-        // emit them...
-        const messages = []
-        result.messages.forEach(msg => {
-          //console.log('poll -', msg)
-          // separate out simple messages to make it easier
-          if (msg.dataMessage && (msg.dataMessage.body || msg.dataMessage.attachments)) {
-            // maybe there will be something here...
-            //console.log('pool dataMessage', msg)
-            // skip session resets
-            // desktop: msg.dataMessage.body === 'TERMINATE' &&
-            if (!(msg.flags === 1)) { // END_SESSION
-              // escalate source
-              messages.push({ ...msg.dataMessage, source: msg.source })
+    if (dmResult || groupResults.length > 0) {
+      const messages = []
+      if (dmResult) {
+        if (dmResult.lastHash !== this.lastHash) {
+          /**
+           * Handle when the cursor in the pubkey's inbox moves
+           * @callback updateLastHashCallback
+           * @param {String} hash The last hash returns from the storage server for this pubkey
+           */
+          /**
+           * Exposes the last hash, so you can persist between reloads where you left off
+           * and not process commands twice
+           * @event SessionClient#updateLastHash
+           * @type updateLastHashCallback
+           */
+          this.emit('updateLastHash', dmResult.lastHash)
+          this.lastHash = dmResult.lastHash
+        }
+        if (dmResult.messages.length) {
+          // emit them...
+
+          dmResult.messages.forEach(msg => {
+            //console.log('poll -', msg)
+            // separate out simple messages to make it easier
+            if (msg.dataMessage && (msg.dataMessage.body || msg.dataMessage.attachments)) {
+              // maybe there will be something here...
+              //console.log('pool dataMessage', msg)
+              // skip session resets
+              // desktop: msg.dataMessage.body === 'TERMINATE' &&
+              if (!(msg.flags === 1)) { // END_SESSION
+                // escalate source
+                messages.push({ ...msg.dataMessage, source: msg.source })
+              }
+            } else
+              if (msg.preKeyBundleMessage) {
+                /**
+                 * content protobuf
+                 * @callback messageCallback
+                 * @param {object} content Content protobuf
+                 */
+                /**
+                 * Received pre-key bundle message
+                 * @event SessionClient#preKeyBundle
+                 * @type messageCallback
+                 */
+                this.emit('preKeyBundle', msg)
+              } else
+                if (msg.receiptMessage) {
+                  /**
+                   * Read Receipt message
+                   * @event SessionClient#receiptMessage
+                   * @type messageCallback
+                   */
+                  this.emit('receiptMessage', msg)
+                } else
+                  if (msg.nullMessage) {
+                    /**
+                     * session established message
+                     * @event SessionClient#nullMessage
+                     * @type messageCallback
+                     */
+                    this.emit('nullMessage', msg)
+                  } else {
+                    console.log('poll - unhandled message', msg)
+                  }
+          })
+        }
+
+        if (groupResults.length) {
+          groupResults.forEach(group => group.groupMessages.forEach(message => {
+            // Exclude our own messages
+            if (message.user.username !== this.ourPubkeyHex) {
+              messages.push({
+                openGroup: group.openGroup,
+                body: message.text,
+                profile: {
+                  displayName: message.user.name,
+                  avatar: message.user.avatar_image.url,
+                },
+                source: message.user.username,
+              })
             }
-          } else
-          if (msg.preKeyBundleMessage) {
-            /**
-             * content protobuf
-             * @callback messageCallback
-             * @param {object} content Content protobuf
-             */
-            /**
-             * Received pre-key bundle message
-             * @event SessionClient#preKeyBundle
-             * @type messageCallback
-             */
-            this.emit('preKeyBundle', msg)
-          } else
-          if (msg.receiptMessage) {
-            /**
-             * Read Receipt message
-             * @event SessionClient#receiptMessage
-             * @type messageCallback
-             */
-            this.emit('receiptMessage', msg)
-          } else
-          if (msg.nullMessage) {
-            /**
-             * session established message
-             * @event SessionClient#nullMessage
-             * @type messageCallback
-             */
-            this.emit('nullMessage', msg)
-          } else {
-            console.log('poll - unhandled message', msg)
-          }
-        })
+          }))
+        }
+
         if (messages.length) {
           /**
            * content dataMessage protobuf
@@ -536,6 +572,44 @@ class SessionClient extends EventEmitter {
     return this.sendLib.send(destination, this.keypair, '', lib, {
       nullMessage: true
     })
+  }
+
+  /**
+   * Join Open Group, Receive Open Group token
+   * @public
+   * @param {String} open group URL (without protocol)
+   * @returns {Promise<Object>} Object {token: {String}, channelId: {Int}, lastMessageId: {Int}}
+   * @example
+   * sessionClient.joinOpenGroup('chat.getsession.org')
+   */
+  async joinOpenGroup(openGroup) {
+    console.log('Joining Open Group', openGroup)
+    this.openGroupServers[openGroup] = {}
+    this.openGroupServers[openGroup].token = await openGroupUtils.getToken(
+      openGroup, this.keypair.privKey, this.ourPubkeyHex
+    )
+    this.openGroupServers[openGroup].channelId = 1
+
+    const subscriptionResult = await openGroupUtils.subscribe(openGroup, this.openGroupServers[openGroup].token, this.openGroupServers[openGroup].channelId)
+    this.openGroupServers[openGroup].lastMessageId = subscriptionResult && subscriptionResult.data && subscriptionResult.data.recent_message_id
+
+    return this.openGroupServers[openGroup]
+  }
+
+  /**
+   * Send Open Group Message
+   * @public
+   * @param {String} open group URL (without protocol)
+   * @param {String} message text body
+   * @param {Object} additional options - not yet implemented
+   * @returns {Promise<Int>} ID of sent message, zero if not successfully sent
+   * @example
+   * sessionClient.joinOpenGroup('chat.getsession.org')
+   */
+  async sendOpenGroupMessage(openGroup, messageTextBody, options = {}) {
+    if (!this.openGroupServers[openGroup]) return false
+    const sendMessageResult = await openGroupUtils.send(openGroup, this.openGroupServers[openGroup].token, this.openGroupServers[openGroup].channelId, this.keypair.privKey, messageTextBody)
+    return sendMessageResult
   }
 }
 
