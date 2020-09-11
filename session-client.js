@@ -607,6 +607,21 @@ class SessionClient extends EventEmitter {
     const sendMessageResult = await openGroupUtils.send(openGroup, this.openGroupServers[openGroup].token, this.openGroupServers[openGroup].channelId, this.keypair.privKey, messageTextBody)
     return sendMessageResult
   }
+
+  /**
+     * Delete Open Group Message
+     * @public
+     * @param {String} open group URL (without protocol)
+     * @param {Array<Int>} array of message IDs to delete
+     * @returns {Promise<Object>} result of deletion
+     * @example
+     * sessionClient.joinOpenGroup('chat.getsession.org')
+     */
+  async deleteOpenGroupMessage(openGroup, messageIds) {
+    if (!this.openGroupServers[openGroup]) return false
+    const deleteMessageResult = await openGroupUtils.messageDelete(openGroup, this.openGroupServers[openGroup].token, this.openGroupServers[openGroup].channelId, messageIds)
+    return deleteMessageResult
+  }
 }
 
 module.exports = SessionClient

@@ -27,7 +27,8 @@ client.loadIdentity({
     fs.writeFileSync('lastHash.txt', hash)
   })
 
-  const openGroupName = 'chat-dev.lokinet.org'
+  // const openGroupName = 'chat-dev.lokinet.org'
+  const openGroupName = 'session.lokisn.com'
 
   await client.joinOpenGroup(openGroupName)
 
@@ -74,7 +75,9 @@ client.loadIdentity({
     // attachments: [attachment]
   })
 
-  await client.sendOpenGroupMessage(openGroupName, 'Sample Open Group Message')
+  await client.deleteOpenGroupMessage(openGroupName, [28, 27, 26])
+
+  //await client.sendOpenGroupMessage(openGroupName, 'Sample Open Group Message 1')
 
   // Open group invite example
   // only works on desktop
