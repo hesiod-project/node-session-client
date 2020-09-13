@@ -635,8 +635,15 @@ class SessionClient extends EventEmitter {
      * sessionClient.joinOpenGroup('chat.getsession.org')
      */
   async deleteOpenGroupMessage(openGroup, messageIds) {
-    if (!this.openGroupServers[openGroup]) return false
-    const deleteMessageResult = await openGroupUtils.messageDelete(openGroup, this.openGroupServers[openGroup].token, this.openGroupServers[openGroup].channelId, messageIds)
+    // attempt to be backwards compatible
+    if (!this.openGroupServers[openGroup]) {
+      openGroup = openGroup.replace('_1', '')
+    }
+    if (!this.openGroupServers[openGroup]) {
+      console.error('deleteOpenGroupMessage - no such openGroup', openGroup)
+      return false
+    }
+    const deleteMessageResult = await this.openGroupServers[openGroup].messageDelete(messageIds)
     return deleteMessageResult
   }
 }
