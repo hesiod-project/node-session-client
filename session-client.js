@@ -21,7 +21,6 @@ const FILESERVER_URL = 'https://file.getsession.org/' // path required!
  * @property {String} displayName Send messages with this profile name
  * @property {String} homeServer HTTPS URL for this identity's file server
  * @property {String} fileServerToken Token for avatar operations
- * @property {String} swarmUrl an storage server HTTPS URL for this identity's swarm
  * @property {String} identityOutput human readable string with seed words if generated a new identity
  * @property {String} ourPubkeyHex This identity's pubkey (SessionID)
  * @property {object} keypair This identity's keypair buffers
@@ -48,7 +47,7 @@ class SessionClient extends EventEmitter {
    */
   constructor(options = {}) {
     super()
-    this.pollRate = options.pollRate || 1000
+    this.pollRate = options.pollRate || 3000
     this.lastHash = options.lastHash || ''
     this.homeServer = options.homeServer || FILESERVER_URL
     this.fileServerToken = options.fileServerToken || ''
@@ -149,10 +148,7 @@ class SessionClient extends EventEmitter {
       console.error('no identity loaded')
       return
     }
-    if (!this.swarmUrl) {
-      this.swarmUrl = await lib.getSwarmsnodeUrl(this.ourPubkeyHex)
-      //console.log('setting swarmUrl for', this.ourPubkeyHex, 'to', this.swarmUrl)
-    }
+    //console.log('open - validated', this.ourPubkeyHex)
     // lazy load recv library
     if (!this.recvLib) {
       /**
@@ -161,13 +157,20 @@ class SessionClient extends EventEmitter {
        */
       this.recvLib = require('./lib/recv.js')
     }
+    //console.log('library loaded', this.ourPubkeyHex)
     this.pollServer = true
 
     // start polling our box
+    //console.log('start poll', this.ourPubkeyHex)
     await this.poll()
+    //console.log('start watchdog', this.ourPubkeyHex)
     this.watchdog() // backup for production use
   }
 
+  /**
+   * watch poller, and make sure it's running if it should be running
+   * @private
+   */
   async watchdog() {
     // if closed
     if (!this.pollServer) {
@@ -177,9 +180,10 @@ class SessionClient extends EventEmitter {
     if (this.lastPoll) {
       const ago = Date.now() - this.lastPoll
       // if you missed 10 polls in a roll
-      if (ago > this.pollRate * 10) {
-        console.warn('SessionClient::watchdog - polling failure, restarting poller')
-        this.poll()
+      if (ago > this.pollRate * 10 * 5) {
+        this.lastPoll = Date.now() // prevent amplification
+        console.warn('SessionClient::watchdog - polling failure, restarting poller', ago, this.pollRate)
+        //this.poll()
       }
     }
     // schedule us again
@@ -203,24 +207,20 @@ class SessionClient extends EventEmitter {
       if (this.debugTimer) console.log('closed...')
       return // don't reschedule
     }
-    if (this.debugTimer) console.log('polling...')
+    if (this.debugTimer) console.log('polling...', this.ourPubkeyHex)
     const dmResult = await this.recvLib.checkBox(
       this.ourPubkeyHex, this.keypair, this.lastHash, lib, this.debugTimer
     )
     const groupResults = (await Promise.all(Object.keys(this.openGroupServers).map(async (openGroup) => {
-      const groupMessages = await openGroupUtils.getMessages(
-        openGroup,
-        this.openGroupServers[openGroup].token,
-        this.openGroupServers[openGroup].channelId,
-        this.openGroupServers[openGroup].lastMessageId
-      )
-      if (groupMessages.length > 0) {
-        this.openGroupServers[openGroup].lastMessageId = groupMessages[0].id
+      //console.log('poll - polling open group', openGroup, this.openGroupServers[openGroup])
+      //console.log('poll - open group token', this.openGroupServers[openGroup].token)
+      const groupMessages = await this.openGroupServers[openGroup].getMessages()
+      if (groupMessages && groupMessages.length > 0) {
         return { openGroup, groupMessages }
       } return undefined
     }))).filter((m) => !!m)
 
-    if (this.debugTimer) console.log('polled...')
+    if (this.debugTimer) console.log('polled...', this.ourPubkeyHex)
     if (dmResult || groupResults.length > 0) {
       const messages = []
       if (dmResult) {
@@ -255,37 +255,37 @@ class SessionClient extends EventEmitter {
                 messages.push({ ...msg.dataMessage, source: msg.source })
               }
             } else
-              if (msg.preKeyBundleMessage) {
-                /**
+            if (msg.preKeyBundleMessage) {
+              /**
                  * content protobuf
                  * @callback messageCallback
                  * @param {object} content Content protobuf
                  */
-                /**
+              /**
                  * Received pre-key bundle message
                  * @event SessionClient#preKeyBundle
                  * @type messageCallback
                  */
-                this.emit('preKeyBundle', msg)
-              } else
-                if (msg.receiptMessage) {
-                  /**
+              this.emit('preKeyBundle', msg)
+            } else
+            if (msg.receiptMessage) {
+              /**
                    * Read Receipt message
                    * @event SessionClient#receiptMessage
                    * @type messageCallback
                    */
-                  this.emit('receiptMessage', msg)
-                } else
-                  if (msg.nullMessage) {
-                    /**
+              this.emit('receiptMessage', msg)
+            } else
+            if (msg.nullMessage) {
+              /**
                      * session established message
                      * @event SessionClient#nullMessage
                      * @type messageCallback
                      */
-                    this.emit('nullMessage', msg)
-                  } else {
-                    console.log('poll - unhandled message', msg)
-                  }
+              this.emit('nullMessage', msg)
+            } else {
+              console.log('poll - unhandled message', msg)
+            }
           })
         }
 
@@ -573,23 +573,33 @@ class SessionClient extends EventEmitter {
   /**
    * Join Open Group, Receive Open Group token
    * @public
+   * @todo also accept with protocol for .loki support
    * @param {String} open group URL (without protocol)
+   * @param {Number} open group Channel
    * @returns {Promise<Object>} Object {token: {String}, channelId: {Int}, lastMessageId: {Int}}
    * @example
    * sessionClient.joinOpenGroup('chat.getsession.org')
    */
-  async joinOpenGroup(openGroup) {
-    console.log('Joining Open Group', openGroup)
-    this.openGroupServers[openGroup] = {}
-    this.openGroupServers[openGroup].token = await openGroupUtils.getToken(
-      openGroup, this.keypair.privKey, this.ourPubkeyHex
-    )
-    this.openGroupServers[openGroup].channelId = 1
+  async joinOpenGroup(openGroupURL, channelId = 1) {
+    console.log('Joining Open Group', openGroupURL)
+    const id = openGroupURL + '_' + channelId
+    this.openGroupServers[id] = new openGroupUtils.SessionOpenGroupChannel(openGroupURL, {
+      channelId: channelId,
+      keypair: this.keypair,
+    })
+    this.openGroupServers[id].token = await openGroupUtils.getToken(openGroupURL,
+      this.keypair.privKey, this.ourPubkeyHex)
 
-    const subscriptionResult = await openGroupUtils.subscribe(openGroup, this.openGroupServers[openGroup].token, this.openGroupServers[openGroup].channelId)
-    this.openGroupServers[openGroup].lastMessageId = subscriptionResult && subscriptionResult.data && subscriptionResult.data.recent_message_id
+    const subscriptionResult = await this.openGroupServers[id].subscribe()
+    this.openGroupServers[id].lastId = subscriptionResult && subscriptionResult.data && subscriptionResult.data.recent_message_id
 
-    return this.openGroupServers[openGroup]
+    // stay backwards compatible
+    return {
+      token: this.openGroupServers[id].token,
+      channelId: channelId,
+      lastMessageId: this.openGroupServers[id].lastId,
+      handle: this.openGroupServers[id]
+    }
   }
 
   /**
@@ -603,8 +613,15 @@ class SessionClient extends EventEmitter {
    * sessionClient.joinOpenGroup('chat.getsession.org')
    */
   async sendOpenGroupMessage(openGroup, messageTextBody, options = {}) {
-    if (!this.openGroupServers[openGroup]) return false
-    const sendMessageResult = await openGroupUtils.send(openGroup, this.openGroupServers[openGroup].token, this.openGroupServers[openGroup].channelId, this.keypair.privKey, messageTextBody)
+    // attempt to be backwards compatible
+    if (!this.openGroupServers[openGroup]) {
+      openGroup = openGroup.replace('_1', '')
+    }
+    if (!this.openGroupServers[openGroup]) {
+      console.error('sendOpenGroupMessage - no such openGroup', openGroup)
+      return false
+    }
+    const sendMessageResult = await this.openGroupServers[openGroup].send(messageTextBody)
     return sendMessageResult
   }
 
