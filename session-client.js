@@ -217,7 +217,8 @@ class SessionClient extends EventEmitter {
       const groupMessages = await this.openGroupServers[openGroup].getMessages()
       if (groupMessages && groupMessages.length > 0) {
         return { openGroup, groupMessages }
-      } return undefined
+      }
+      return undefined
     }))).filter((m) => !!m)
 
     if (this.debugTimer) console.log('polled...', this.ourPubkeyHex)
@@ -511,7 +512,7 @@ class SessionClient extends EventEmitter {
     return this.sendLib.send(destination, this.keypair, undefined, lib, {
       groupInvitation: {
         serverAddress: serverAddress,
-        channelId: channelId,
+        channelId: parseInt(channelId),
         serverName: serverName
       }
     })
@@ -598,7 +599,8 @@ class SessionClient extends EventEmitter {
       token: this.openGroupServers[id].token,
       channelId: channelId,
       lastMessageId: this.openGroupServers[id].lastId,
-      handle: this.openGroupServers[id]
+      handle: this.openGroupServers[id],
+      id: id // best to pass to other functions...
     }
   }
 
