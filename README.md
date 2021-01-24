@@ -9,14 +9,13 @@ Supports
 - Recovery Phrase (13 words)
 - Support for communicating with the Loki 7.x network
 - Desktop open-group invitations
+- opengroups
 
 Working on:
+- Session protocol support
 - bugs / error codes
-- ratcheting/PFS (whisper protocol)
-- opengroups
 - removing webcrypto in favor of node native crypto functions
 - relying on less 3rd party NPMs (for security reasons)
-
 
 [Documentation](https://hesiod-project.github.io/node-session-client/)
 
