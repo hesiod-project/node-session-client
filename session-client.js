@@ -85,7 +85,15 @@ class SessionClient extends EventEmitter {
   async loadIdentity(options = {}) {
     if (options.seed) {
       // decode seed into keypair
-      options.keypair = keyUtil.wordsToKeyPair(options.seed)
+      options.keypair = await keyUtil.wordsToKeyPair(options.seed)
+      if (options.keypair.err) {
+        console.error('err', options.keypair.err)
+        process.exit(1)
+      }
+      if (!options.keypair) {
+        console.error('keypair generation failed')
+        process.exit(1)
+      }
       this.identityOutput = 'Loaded SessionID ' + options.keypair.pubKey.toString('hex') + ' from seed words'
     }
     // ensure keypair
@@ -256,18 +264,13 @@ class SessionClient extends EventEmitter {
                 messages.push({ ...msg.dataMessage, source: msg.source })
               }
             } else
-            if (msg.preKeyBundleMessage) {
+            if (msg.typingMessage) {
               /**
-                 * content protobuf
-                 * @callback messageCallback
-                 * @param {object} content Content protobuf
-                 */
-              /**
-                 * Received pre-key bundle message
-                 * @event SessionClient#preKeyBundle
-                 * @type messageCallback
-                 */
-              this.emit('preKeyBundle', msg)
+                   * Typing message
+                   * @event SessionClient#typingMessage
+                   * @type messageCallback
+                   */
+              this.emit('typingMessage', msg)
             } else
             if (msg.receiptMessage) {
               /**
@@ -588,6 +591,7 @@ class SessionClient extends EventEmitter {
       channelId: channelId,
       keypair: this.keypair,
     })
+    // FIXME failure condition?
     this.openGroupServers[id].token = await openGroupUtils.getToken(openGroupURL,
       this.keypair.privKey, this.ourPubkeyHex)
 
