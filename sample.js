@@ -27,10 +27,10 @@ client.loadIdentity({
     fs.writeFileSync('lastHash.txt', hash)
   })
 
-  // const openGroupName = 'chat-dev.lokinet.org'
-  const openGroupName = 'session.lokisn.com'
+  //const openGroupName = 'session.lokisn.com'
+  const openGroupName = 'feedback.getsession.org'
 
-  await client.joinOpenGroup(openGroupName)
+  const ogOpened = await client.joinOpenGroup(openGroupName)
 
   // handle incoming messages
   client.on('messages', msgs => {
@@ -60,7 +60,8 @@ client.loadIdentity({
   await client.open()
 
   // TODO: replace with your SessionID
-  const SessionID = '05d233c6c8daed63a48dfc872a6602512fd5a18fc764a6d75a08b9b25e7562851a'
+  const SessionID = '05ce7f197b3e4fa80331397ebb68fb5d66e47f92594ab76bb67233105b78ced238' // ipadtop
+
   // LNS example
   //
   //const lnsUtils = require('./lib/lns.js')
@@ -73,9 +74,13 @@ client.loadIdentity({
   //const attachment = await client.makeImageAttachment(fs.readFileSync('/Users/user2/Pictures/1587699732-0s.png'))
   client.send(SessionID, 'Hello', {
     // attachments: [attachment]
+  }).then(() => {
+    console.debug('Sent "Hello" to', SessionID)
   })
 
-  await client.deleteOpenGroupMessage(openGroupName, [28, 27, 26])
+  if (ogOpened) {
+    //await client.deleteOpenGroupMessage(openGroupName, [28, 27, 26])
+  }
 
   //await client.sendOpenGroupMessage(openGroupName, 'Sample Open Group Message 1')
 
