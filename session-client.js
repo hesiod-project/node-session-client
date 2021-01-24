@@ -193,7 +193,7 @@ class SessionClient extends EventEmitter {
       // if you missed 10 polls in a roll
       if (ago > this.pollRate * 10 * 5) {
         this.lastPoll = Date.now() // prevent amplification
-        console.warn('SessionClient::watchdog - polling failure, restarting poller', ago, this.pollRate)
+        console.warn('SessionClient::watchdog - polling failure, would restart poller', ago, this.pollRate)
         //this.poll()
       }
     }
@@ -551,34 +551,6 @@ class SessionClient extends EventEmitter {
     }
     await this.send(destination, msg)
     return this.sendOpenGroupInvite(destination, serverName, serverAddress, channelId)
-  }
-
-  /**
-   * Request a session reset
-   * @public
-   * @param {String} destination pubkey of who you want to send to
-   * @returns {Promise<Bool>} If operation was successful or not
-   * @example
-   * sessionClient.sendSessionReset('05d233c6c8daed63a48dfc872a6602512fd5a18fc764a6d75a08b9b25e7562851a')
-   */
-  async sendSessionReset(destination) {
-    return this.sendLib.send(destination, this.keypair, 'TERMINATE', lib, {
-      flags: 1
-    })
-  }
-
-  /**
-   * Respond that session has been established
-   * @public
-   * @param {String} destination pubkey of who you want to send to
-   * @returns {Promise<Bool>} If operation was successful or not
-   * @example
-   * sessionClient.sendSessionEstablished('05d233c6c8daed63a48dfc872a6602512fd5a18fc764a6d75a08b9b25e7562851a')
-   */
-  async sendSessionEstablished(destination) {
-    return this.sendLib.send(destination, this.keypair, '', lib, {
-      nullMessage: true
-    })
   }
 
   /**
