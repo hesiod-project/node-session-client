@@ -26,11 +26,12 @@
     
     <section>
         <article>
-            <pre class="prettyprint source linenums"><code>const fs     = require('fs')
-const EventEmitter  = require('events')
+            <pre class="prettyprint source linenums"><code>const fs = require('fs')
+const EventEmitter = require('events')
 
 const lib = require('./lib/lib.js')
 const attachemntUtils = require('./lib/attachments.js')
+const openGroupUtils = require('./lib/open_groups.js')
 const keyUtil = require('./external/mnemonic/index.js')
 
 /**
@@ -48,7 +49,6 @@ const FILESERVER_URL = 'https://file.getsession.org/' // path required!
  * @property {String} displayName Send messages with this profile name
  * @property {String} homeServer HTTPS URL for this identity's file server
  * @property {String} fileServerToken Token for avatar operations
- * @property {String} swarmUrl an storage server HTTPS URL for this identity's swarm
  * @property {String} identityOutput human readable string with seed words if generated a new identity
  * @property {String} ourPubkeyHex This identity's pubkey (SessionID)
  * @property {object} keypair This identity's keypair buffers
@@ -75,14 +75,16 @@ class SessionClient extends EventEmitter {
    */
   constructor(options = {}) {
     super()
-    this.pollRate = options.pollRate || 1000
+    this.pollRate = options.pollRate || 3000
     this.lastHash = options.lastHash || ''
     this.homeServer = options.homeServer || FILESERVER_URL
     this.fileServerToken = options.fileServerToken || ''
     this.displayName = options.displayName || false
+    this.openGroupServers = {}
     this.pollServer = false
     this.groupInviteTextTemplate = '{pubKey} has invited you to join {name} at {url}'
     this.groupInviteNonC1TextTemplate = ' You may not be able to join this channel if you are using a mobile session client'
+    this.lastPoll = 0
   }
 
   // maybe a setName option
@@ -111,7 +113,15 @@ class SessionClient extends EventEmitter {
   async loadIdentity(options = {}) {
     if (options.seed) {
       // decode seed into keypair
-      options.keypair = keyUtil.wordsToKeyPair(options.seed)
+      options.keypair = await keyUtil.wordsToKeyPair(options.seed)
+      if (options.keypair.err) {
+        console.error('err', options.keypair.err)
+        process.exit(1)
+      }
+      if (!options.keypair) {
+        console.error('keypair generation failed')
+        process.exit(1)
+      }
       this.identityOutput = 'Loaded SessionID ' + options.keypair.pubKey.toString('hex') + ' from seed words'
     }
     // ensure keypair
@@ -136,7 +146,10 @@ class SessionClient extends EventEmitter {
           this.ourPubkeyHex
         )
         if (!avatarRes) {
-          console.warn('SessionClient::loadIdentity - getAvatar failure', avatarRes)
+          // false just means not set
+          if (avatarRes === undefined) {
+            console.warn('SessionClient::loadIdentity - getAvatar failure', avatarRes)
+          }
         } else {
           this.encAvatarUrl = avatarRes.url
           this.profileKeyBuf = Buffer.from(avatarRes.profileKey64, 'base64')
@@ -147,7 +160,7 @@ class SessionClient extends EventEmitter {
             console.warn('SessionClient::loadIdentity - downloadEncryptedAvatar failure', netData)
           } else {
             if (avatarDisk.byteLength !== netData.byteLength ||
-                Buffer.compare(avatarDisk, netData) !== 0) {
+              Buffer.compare(avatarDisk, netData) !== 0) {
               console.log('SessionClient::loadIdentity - detected avatar change, replacing')
               await this.changeAvatar(avatarDisk)
             } else {
@@ -174,10 +187,7 @@ class SessionClient extends EventEmitter {
       console.error('no identity loaded')
       return
     }
-    if (!this.swarmUrl) {
-      this.swarmUrl = await lib.getSwarmsnodeUrl(this.ourPubkeyHex)
-      //console.log('setting swarmUrl for', this.ourPubkeyHex, 'to', this.swarmUrl)
-    }
+    //console.log('open - validated', this.ourPubkeyHex)
     // lazy load recv library
     if (!this.recvLib) {
       /**
@@ -186,9 +196,39 @@ class SessionClient extends EventEmitter {
        */
       this.recvLib = require('./lib/recv.js')
     }
+    //console.log('library loaded', this.ourPubkeyHex)
     this.pollServer = true
+
     // start polling our box
-    this.poll()
+    //console.log('start poll', this.ourPubkeyHex)
+    await this.poll()
+    //console.log('start watchdog', this.ourPubkeyHex)
+    this.watchdog() // backup for production use
+  }
+
+  /**
+   * watch poller, and make sure it's running if it should be running
+   * @private
+   */
+  async watchdog() {
+    // if closed
+    if (!this.pollServer) {
+      return // don't reschedule
+    }
+    // make sure we've polled successfully at least once
+    if (this.lastPoll) {
+      const ago = Date.now() - this.lastPoll
+      // if you missed 10 polls in a roll
+      if (ago > this.pollRate * 10 * 5) {
+        this.lastPoll = Date.now() // prevent amplification
+        console.warn('SessionClient::watchdog - polling failure, restarting poller', ago, this.pollRate)
+        //this.poll()
+      }
+    }
+    // schedule us again
+    setTimeout(() => {
+      this.watchdog()
+    }, this.pollRate)
   }
 
   /**
@@ -201,75 +241,106 @@ class SessionClient extends EventEmitter {
    * @fires SessionClient#messages
    */
   async poll() {
-    if (this.debugTimer) console.log('polling...')
-    const result = await this.recvLib.checkBox(
+    // if closed
+    if (!this.pollServer) {
+      if (this.debugTimer) console.log('closed...')
+      return // don't reschedule
+    }
+    if (this.debugTimer) console.log('polling...', this.ourPubkeyHex, this.lastHash)
+    const dmResult = await this.recvLib.checkBox(
       this.ourPubkeyHex, this.keypair, this.lastHash, lib, this.debugTimer
     )
-    if (this.debugTimer) console.log('polled...')
-    if (result) {
-      if (result.lastHash !== this.lastHash) {
-        /**
-         * Handle when the cursor in the pubkey's inbox moves
-         * @callback updateLastHashCallback
-         * @param {String} hash The last hash returns from the storage server for this pubkey
-         */
-        /**
-         * Exposes the last hash, so you can persist between reloads where you left off
-         * and not process commands twice
-         * @event SessionClient#updateLastHash
-         * @type updateLastHashCallback
-         */
-        this.emit('updateLastHash', result.lastHash)
-        this.lastHash = result.lastHash
+    const groupResults = (await Promise.all(Object.keys(this.openGroupServers).map(async (openGroup) => {
+      //console.log('poll - polling open group', openGroup, this.openGroupServers[openGroup])
+      //console.log('poll - open group token', this.openGroupServers[openGroup].token)
+      const groupMessages = await this.openGroupServers[openGroup].getMessages()
+      if (groupMessages &amp;&amp; groupMessages.length > 0) {
+        return { openGroup, groupMessages }
       }
-      if (result.messages.length) {
-        // emit them...
-        const messages = []
-        result.messages.forEach(msg => {
-          //console.log('poll -', msg)
-          // separate out simple messages to make it easier
-          if (msg.dataMessage &amp;&amp; (msg.dataMessage.body || msg.dataMessage.attachments)) {
-            // maybe there will be something here...
-            //console.log('pool dataMessage', msg)
-            // skip session resets
-            // desktop: msg.dataMessage.body === 'TERMINATE' &amp;&amp;
-            if (!(msg.flags === 1)) { // END_SESSION
-              // escalate source
-              messages.push({ ...msg.dataMessage, source: msg.source })
+      return undefined
+    }))).filter((m) => !!m)
+
+    if (this.debugTimer) console.log('polled...', this.ourPubkeyHex)
+    if (dmResult || groupResults.length > 0) {
+      const messages = []
+      if (dmResult) {
+        if (dmResult.lastHash !== this.lastHash) {
+          /**
+           * Handle when the cursor in the pubkey's inbox moves
+           * @callback updateLastHashCallback
+           * @param {String} hash The last hash returns from the storage server for this pubkey
+           */
+          /**
+           * Exposes the last hash, so you can persist between reloads where you left off
+           * and not process commands twice
+           * @event SessionClient#updateLastHash
+           * @type updateLastHashCallback
+           */
+          this.emit('updateLastHash', dmResult.lastHash)
+          this.lastHash = dmResult.lastHash
+        }
+        if (dmResult.messages.length) {
+          // emit them...
+
+          dmResult.messages.forEach(msg => {
+            //console.log('poll -', msg)
+            // separate out simple messages to make it easier
+            if (msg.dataMessage &amp;&amp; (msg.dataMessage.body || msg.dataMessage.attachments)) {
+              // maybe there will be something here...
+              //console.log('pool dataMessage', msg)
+              // skip session resets
+              // desktop: msg.dataMessage.body === 'TERMINATE' &amp;&amp;
+              if (!(msg.flags === 1)) { // END_SESSION
+                // escalate source
+                messages.push({ ...msg.dataMessage, source: msg.source })
+              }
+            } else
+            if (msg.typingMessage) {
+              /**
+                   * Typing message
+                   * @event SessionClient#typingMessage
+                   * @type messageCallback
+                   */
+              this.emit('typingMessage', msg)
+            } else
+            if (msg.receiptMessage) {
+              /**
+                   * Read Receipt message
+                   * @event SessionClient#receiptMessage
+                   * @type messageCallback
+                   */
+              this.emit('receiptMessage', msg)
+            } else
+            if (msg.nullMessage) {
+              /**
+                     * session established message
+                     * @event SessionClient#nullMessage
+                     * @type messageCallback
+                     */
+              this.emit('nullMessage', msg)
+            } else {
+              console.log('poll - unhandled message', msg)
             }
-          } else
-          if (msg.preKeyBundleMessage) {
-            /**
-             * content protobuf
-             * @callback messageCallback
-             * @param {object} content Content protobuf
-             */
-            /**
-             * Received pre-key bundle message
-             * @event SessionClient#preKeyBundle
-             * @type messageCallback
-             */
-            this.emit('preKeyBundle', msg)
-          } else
-          if (msg.receiptMessage) {
-            /**
-             * Read Receipt message
-             * @event SessionClient#receiptMessage
-             * @type messageCallback
-             */
-            this.emit('receiptMessage', msg)
-          } else
-          if (msg.nullMessage) {
-            /**
-             * session established message
-             * @event SessionClient#nullMessage
-             * @type messageCallback
-             */
-            this.emit('nullMessage', msg)
-          } else {
-            console.log('poll - unhandled message', msg)
-          }
-        })
+          })
+        }
+
+        if (groupResults.length) {
+          groupResults.forEach(group => group.groupMessages.forEach(message => {
+            // Exclude our own messages
+            if (message.user.username !== this.ourPubkeyHex) {
+              messages.push({
+                openGroup: group.openGroup,
+                body: message.text,
+                profile: {
+                  displayName: message.user.name,
+                  avatar: message.user.avatar_image.url,
+                },
+                source: message.user.username,
+              })
+            }
+          }))
+        }
+
         if (messages.length) {
           /**
            * content dataMessage protobuf
@@ -286,15 +357,11 @@ class SessionClient extends EventEmitter {
         }
       }
     }
+    this.lastPoll = Date.now()
     if (this.debugTimer) console.log('scheduled...')
     setTimeout(() => {
       if (this.debugTimer) console.log('firing...')
-      if (this.pollServer) {
-        if (this.debugTimer) console.log('calling...')
-        this.poll()
-      } else {
-        if (this.debugTimer) console.log('closed...')
-      }
+      this.poll()
     }, this.pollRate)
   }
 
@@ -353,7 +420,7 @@ class SessionClient extends EventEmitter {
    * @return {Promise&lt;Object>} returns an attachmentPointer
    */
   async makeImageAttachment(data) {
-    return attachemntUtils.uploadEncryptedAttachment(this.homeserver, data)
+    return attachemntUtils.uploadEncryptedAttachment(this.homeServer, data)
   }
 
   /**
@@ -364,8 +431,12 @@ class SessionClient extends EventEmitter {
   async ensureFileServerToken() {
     if (!this.fileServerToken) {
       // we need a token...
+      if (!this.homeServer) {
+        console.trace('ensureFileServerToken - No home server set')
+        return
+      }
       this.fileServerToken = await attachemntUtils.getToken(
-        this.homeserver, this.keypair.privKey, this.ourPubkeyHex
+        this.homeServer, this.keypair.privKey, this.ourPubkeyHex
       )
       /**
        * Handle when we get a new home server token
@@ -396,7 +467,7 @@ class SessionClient extends EventEmitter {
     }
     await this.ensureFileServerToken()
     const res = await attachemntUtils.uploadEncryptedAvatar(
-      this.homeserver, this.fileServerToken, this.ourPubkeyHex, data)
+      this.homeServer, this.fileServerToken, this.ourPubkeyHex, data)
     //console.log('SessionClient::changeAvatar - res', res)
     /* profileKeyBuf: buffer
       url: string */
@@ -479,7 +550,7 @@ class SessionClient extends EventEmitter {
     return this.sendLib.send(destination, this.keypair, undefined, lib, {
       groupInvitation: {
         serverAddress: serverAddress,
-        channelId: channelId,
+        channelId: parseInt(channelId),
         serverName: serverName
       }
     })
@@ -506,7 +577,7 @@ class SessionClient extends EventEmitter {
     if (channelId !== 1) {
       msg += this.groupInviteNonC1TextTemplate
     }
-    await this.send(destination, msg,)
+    await this.send(destination, msg)
     return this.sendOpenGroupInvite(destination, serverName, serverAddress, channelId)
   }
 
@@ -537,6 +608,85 @@ class SessionClient extends EventEmitter {
       nullMessage: true
     })
   }
+
+  /**
+   * Join Open Group, Receive Open Group token
+   * @public
+   * @todo also accept with protocol for .loki support
+   * @param {String} open group URL (without protocol)
+   * @param {Number} open group Channel
+   * @returns {Promise&lt;Object>} Object {token: {String}, channelId: {Int}, lastMessageId: {Int}}
+   * @example
+   * sessionClient.joinOpenGroup('chat.getsession.org')
+   */
+  async joinOpenGroup(openGroupURL, channelId = 1) {
+    console.log('Joining Open Group', openGroupURL)
+    const id = openGroupURL + '_' + channelId
+    this.openGroupServers[id] = new openGroupUtils.SessionOpenGroupChannel(openGroupURL, {
+      channelId: channelId,
+      keypair: this.keypair,
+    })
+    // FIXME failure condition?
+    this.openGroupServers[id].token = await openGroupUtils.getToken(openGroupURL,
+      this.keypair.privKey, this.ourPubkeyHex)
+
+    const subscriptionResult = await this.openGroupServers[id].subscribe()
+    this.openGroupServers[id].lastId = subscriptionResult &amp;&amp; subscriptionResult.data &amp;&amp; subscriptionResult.data.recent_message_id
+
+    // stay backwards compatible
+    return {
+      token: this.openGroupServers[id].token,
+      channelId: channelId,
+      lastMessageId: this.openGroupServers[id].lastId,
+      handle: this.openGroupServers[id],
+      id: id // best to pass to other functions...
+    }
+  }
+
+  /**
+   * Send Open Group Message
+   * @public
+   * @param {String} open group URL (without protocol)
+   * @param {String} message text body
+   * @param {Object} additional options - not yet implemented
+   * @returns {Promise&lt;Int>} ID of sent message, zero if not successfully sent
+   * @example
+   * sessionClient.joinOpenGroup('chat.getsession.org')
+   */
+  async sendOpenGroupMessage(openGroup, messageTextBody, options = {}) {
+    // attempt to be backwards compatible
+    if (!this.openGroupServers[openGroup]) {
+      openGroup = openGroup.replace('_1', '')
+    }
+    if (!this.openGroupServers[openGroup]) {
+      console.error('sendOpenGroupMessage - no such openGroup', openGroup)
+      return false
+    }
+    const sendMessageResult = await this.openGroupServers[openGroup].send(messageTextBody)
+    return sendMessageResult
+  }
+
+  /**
+     * Delete Open Group Message
+     * @public
+     * @param {String} open group URL (without protocol)
+     * @param {Array&lt;Int>} array of message IDs to delete
+     * @returns {Promise&lt;Object>} result of deletion
+     * @example
+     * sessionClient.joinOpenGroup('chat.getsession.org')
+     */
+  async deleteOpenGroupMessage(openGroup, messageIds) {
+    // attempt to be backwards compatible
+    if (!this.openGroupServers[openGroup]) {
+      openGroup = openGroup.replace('_1', '')
+    }
+    if (!this.openGroupServers[openGroup]) {
+      console.error('deleteOpenGroupMessage - no such openGroup', openGroup)
+      return false
+    }
+    const deleteMessageResult = await this.openGroupServers[openGroup].messageDelete(messageIds)
+    return deleteMessageResult
+  }
 }
 
 module.exports = SessionClient
@@ -550,13 +700,13 @@ module.exports = SessionClient
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-lns.html">lns</a></li><li><a href="module-session-client.html">session-client</a></li></ul><h3>Classes</h3><ul><li><a href="module-session-client-SessionClient.html">SessionClient</a></li></ul><h3>Events</h3><ul><li><a href="SessionClient.html#event:fileServerToken">fileServerToken</a></li><li><a href="SessionClient.html#event:messages">messages</a></li><li><a href="SessionClient.html#event:nullMessage">nullMessage</a></li><li><a href="SessionClient.html#event:preKeyBundle">preKeyBundle</a></li><li><a href="SessionClient.html#event:receiptMessage">receiptMessage</a></li><li><a href="SessionClient.html#event:updateLastHash">updateLastHash</a></li></ul><h3>Global</h3><ul><li><a href="global.html#FILESERVER_URL">FILESERVER_URL</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-lns.html">lns</a></li><li><a href="module-session-client.html">session-client</a></li></ul><h3>Classes</h3><ul><li><a href="module-session-client-SessionClient.html">SessionClient</a></li></ul><h3>Events</h3><ul><li><a href="SessionClient.html#event:fileServerToken">fileServerToken</a></li><li><a href="SessionClient.html#event:messages">messages</a></li><li><a href="SessionClient.html#event:nullMessage">nullMessage</a></li><li><a href="SessionClient.html#event:receiptMessage">receiptMessage</a></li><li><a href="SessionClient.html#event:typingMessage">typingMessage</a></li><li><a href="SessionClient.html#event:updateLastHash">updateLastHash</a></li></ul><h3>Global</h3><ul><li><a href="global.html#FILESERVER_URL">FILESERVER_URL</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.5</a> on Sun Sep 06 2020 17:55:15 GMT-0700 (Pacific Daylight Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.6</a> on Sun Jan 24 2021 16:45:58 GMT+0000 (Coordinated Universal Time)
 </footer>
 
 <script> prettyPrint(); </script>
