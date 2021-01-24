@@ -118,7 +118,10 @@ class SessionClient extends EventEmitter {
           this.ourPubkeyHex
         )
         if (!avatarRes) {
-          console.warn('SessionClient::loadIdentity - getAvatar failure', avatarRes)
+          // false just means not set
+          if (avatarRes === undefined) {
+            console.warn('SessionClient::loadIdentity - getAvatar failure', avatarRes)
+          }
         } else {
           this.encAvatarUrl = avatarRes.url
           this.profileKeyBuf = Buffer.from(avatarRes.profileKey64, 'base64')
@@ -215,7 +218,7 @@ class SessionClient extends EventEmitter {
       if (this.debugTimer) console.log('closed...')
       return // don't reschedule
     }
-    if (this.debugTimer) console.log('polling...', this.ourPubkeyHex)
+    if (this.debugTimer) console.log('polling...', this.ourPubkeyHex, this.lastHash)
     const dmResult = await this.recvLib.checkBox(
       this.ourPubkeyHex, this.keypair, this.lastHash, lib, this.debugTimer
     )
@@ -389,7 +392,7 @@ class SessionClient extends EventEmitter {
    * @return {Promise<Object>} returns an attachmentPointer
    */
   async makeImageAttachment(data) {
-    return attachemntUtils.uploadEncryptedAttachment(this.homeserver, data)
+    return attachemntUtils.uploadEncryptedAttachment(this.homeServer, data)
   }
 
   /**
@@ -400,8 +403,12 @@ class SessionClient extends EventEmitter {
   async ensureFileServerToken() {
     if (!this.fileServerToken) {
       // we need a token...
+      if (!this.homeServer) {
+        console.trace('ensureFileServerToken - No home server set')
+        return
+      }
       this.fileServerToken = await attachemntUtils.getToken(
-        this.homeserver, this.keypair.privKey, this.ourPubkeyHex
+        this.homeServer, this.keypair.privKey, this.ourPubkeyHex
       )
       /**
        * Handle when we get a new home server token
@@ -432,7 +439,7 @@ class SessionClient extends EventEmitter {
     }
     await this.ensureFileServerToken()
     const res = await attachemntUtils.uploadEncryptedAvatar(
-      this.homeserver, this.fileServerToken, this.ourPubkeyHex, data)
+      this.homeServer, this.fileServerToken, this.ourPubkeyHex, data)
     //console.log('SessionClient::changeAvatar - res', res)
     /* profileKeyBuf: buffer
       url: string */
