@@ -2,7 +2,7 @@
 Implementation of Session client in node
 
 Supports
-- DH (non ratcheted/PFS) communication
+- Session protocol support
 - Avatars
 - Attachments
 - LNS
@@ -12,8 +12,8 @@ Supports
 - opengroups
 
 Working on:
-- Session protocol support
 - bugs / error codes
+- closed group support
 - removing webcrypto in favor of node native crypto functions
 - relying on less 3rd party NPMs (for security reasons)
 
