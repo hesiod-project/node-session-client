@@ -54,7 +54,7 @@ class SessionClient extends EventEmitter {
     this.displayName = options.displayName || false
     this.openGroupServers = {}
     this.pollServer = false
-    this.groupInviteTextTemplate = '{pubKey} has invited you to join {name} at {url}'
+    this.groupInviteTextTemplate = '{pubKey} has invited you to join {name} at'
     this.groupInviteNonC1TextTemplate = ' You may not be able to join this channel if you are using a mobile session client'
     this.lastPoll = 0
   }
@@ -276,6 +276,7 @@ class SessionClient extends EventEmitter {
               this.emit('typingMessage', msg)
             } else
             if (msg.receiptMessage) {
+              // msg.recieptMessage.timestamp is an array of unsigned protobuf longs..
               /**
                    * Read Receipt message
                    * @event SessionClient#receiptMessage
@@ -550,6 +551,8 @@ class SessionClient extends EventEmitter {
       msg += this.groupInviteNonC1TextTemplate
     }
     await this.send(destination, msg)
+    // send the URL separately...
+    await this.send(destination, serverAddress)
     return this.sendOpenGroupInvite(destination, serverName, serverAddress, channelId)
   }
 
