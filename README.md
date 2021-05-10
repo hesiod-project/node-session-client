@@ -7,7 +7,7 @@ Supports
 - Attachments
 - LNS
 - Recovery Phrase (13 words)
-- Support for communicating with the Loki 7.x network
+- Support for communicating with the Loki 9.x network
 - Desktop open-group invitations
 - open groups
 - open groups v2
