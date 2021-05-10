@@ -1,9 +1,11 @@
 const fs = require('fs')
+const urlparser    = require('url')
 const EventEmitter = require('events')
 
 const lib = require('./lib/lib.js')
 const attachemntUtils = require('./lib/attachments.js')
 const openGroupUtils = require('./lib/open_groups.js')
+const openGroupUtilsV2 = require('./lib/open_group_v2.js')
 const keyUtil = require('./external/mnemonic/index.js')
 
 /**
@@ -47,12 +49,13 @@ class SessionClient extends EventEmitter {
    */
   constructor(options = {}) {
     super()
-    this.pollRate = options.pollRate || 3000
+    this.pollRate = options.pollRate || 30000
     this.lastHash = options.lastHash || ''
     this.homeServer = options.homeServer || FILESERVER_URL
     this.fileServerToken = options.fileServerToken || ''
     this.displayName = options.displayName || false
     this.openGroupServers = {}
+    this.openGroupV2Servers = {}
     this.pollServer = false
     this.groupInviteTextTemplate = '{pubKey} has invited you to join {name} at'
     this.groupInviteNonC1TextTemplate = ' You may not be able to join this channel if you are using a mobile session client'
@@ -102,6 +105,8 @@ class SessionClient extends EventEmitter {
       this.identityOutput = 'SessionID ' + res.keypair.pubKey.toString('hex') + ' seed words: ' + res.words
       options.keypair = res.keypair
     }
+    // ensure hexstr
+    options.keypair.publicKeyHex = options.keypair.pubKey.toString('hex')
     if (options.displayName) {
       this.displayName = options.displayName
     }
@@ -231,10 +236,12 @@ class SessionClient extends EventEmitter {
       }
       return undefined
     }))).filter((m) => !!m)
+    const v2GroupResults = await openGroupUtilsV2.SessionOpenGroupV2Manager.getMessages()
+    //console.log('v2GroupResults', v2GroupResults)
 
     if (this.debugTimer) console.log('polled...', this.ourPubkeyHex)
-    if (dmResult || groupResults.length > 0) {
-      const messages = []
+    if (dmResult || groupResults.length > 0 || v2GroupResults.length > 0) {
+      const messages = v2GroupResults
       if (dmResult) {
         if (dmResult.lastHash !== this.lastHash) {
           /**
@@ -284,6 +291,14 @@ class SessionClient extends EventEmitter {
                    */
               this.emit('receiptMessage', msg)
             } else
+            if (msg.configurationMessage) {
+              /**
+                   * Multidevice config message
+                   * @event SessionClient#configurationMessage
+                   * @type messageCallback
+                   */
+              this.emit('configurationMessage', msg)
+            } else
             if (msg.nullMessage) {
               /**
                      * session established message
@@ -301,6 +316,7 @@ class SessionClient extends EventEmitter {
           groupResults.forEach(group => group.groupMessages.forEach(message => {
             // Exclude our own messages
             if (message.user.username !== this.ourPubkeyHex) {
+              // FIXME: quotes? attachments?
               messages.push({
                 openGroup: group.openGroup,
                 body: message.text,
@@ -313,7 +329,6 @@ class SessionClient extends EventEmitter {
             }
           }))
         }
-
         if (messages.length) {
           /**
            * content dataMessage protobuf
@@ -504,7 +519,12 @@ class SessionClient extends EventEmitter {
         profileKeyBuf: this.profileKeyBuf
       }
     }
-    return this.sendLib.send(destination, this.keypair, messageTextBody, lib, sendOptions)
+    try {
+      return this.sendLib.send(destination, this.keypair, messageTextBody, lib, sendOptions)
+    } catch (e) {
+      console.error('session-client::send - exception', e)
+    }
+    return false
   }
 
   /**
@@ -591,6 +611,34 @@ class SessionClient extends EventEmitter {
   }
 
   /**
+   * Join Open Group V2, Receive Open Group V2 token
+   * @public
+   * @param {String} open group handle
+   * @param {Number} open group Channel
+   * @returns {Promise<Object>} Object {token: {String}, channelId: {Int}, lastMessageId: {Int}}
+   * @example
+   * sessionClient.joinOpenGroup('chat.getsession.org')
+   */
+  async joinOpenGroupV2(openGroupURL, options = {}) {
+    console.log('Joining Open Group V2', openGroupURL)
+
+    // parre URL into parts
+    const urlDetails = new urlparser.URL(openGroupURL)
+    //console.log('urlDetails', urlDetails)
+    const baseUrl = urlDetails.protocol + '//' + urlDetails.host
+    const room = urlDetails.pathname.substr(1).toString()
+    const serverPubkeyHex = urlDetails.searchParams.get('public_key')
+
+    // ensure room
+    const roomObj = openGroupUtilsV2.SessionOpenGroupV2Manager.joinServerRoom(
+      baseUrl, serverPubkeyHex, this.keypair, room, options)
+    // get token, so we can get initial messages
+    roomObj.ensureToken()
+    // return handle
+    return roomObj
+  }
+
+  /**
    * Send Open Group Message
    * @public
    * @param {String} open group URL (without protocol)
@@ -614,9 +662,23 @@ class SessionClient extends EventEmitter {
   }
 
   /**
+   * Send Open Group V2 Message
+   * @public
+   * @param {String} open group handle
+   * @param {String} message text body
+   * @param {Object} additional options - not yet implemented
+   * @returns {Promise<Int>} ID of sent message, zero if not successfully sent
+   * @example
+   * sessionClient.joinOpenGroup('chat.getsession.org')
+   */
+  async sendOpenGroupV2Message(roomObj, messageTextBody, options = {}) {
+    return roomObj.send(messageTextBody, options)
+  }
+
+  /**
      * Delete Open Group Message
      * @public
-     * @param {String} open group URL (without protocol)
+     * @param {String} open group handle (without protocol)
      * @param {Array<Int>} array of message IDs to delete
      * @returns {Promise<Object>} result of deletion
      * @example
@@ -633,6 +695,23 @@ class SessionClient extends EventEmitter {
     }
     const deleteMessageResult = await this.openGroupServers[openGroup].messageDelete(messageIds)
     return deleteMessageResult
+  }
+
+  /**
+     * Delete Open Group V2 Message
+     * @public
+     * @param {String} open group V2 handle
+     * @param {Int} message ID to delete
+     * @returns {Promise<Array>} result of deletion (false, null or true)
+     * @example
+     * sessionClient.joinOpenGroup('chat.getsession.org')
+     */
+  deleteOpenGroupV2Message(roomObj, messageIds) {
+    if (!Array.isArray(messageIds)) { messageIds = [messageIds] }
+    // fire them all off in parallel
+    return Promise.all(messageIds.map(id => {
+      return roomObj.messageDelete(id)
+    }))
   }
 }
 
