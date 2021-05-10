@@ -27,11 +27,13 @@
     <section>
         <article>
             <pre class="prettyprint source linenums"><code>const fs = require('fs')
+const urlparser    = require('url')
 const EventEmitter = require('events')
 
 const lib = require('./lib/lib.js')
 const attachemntUtils = require('./lib/attachments.js')
 const openGroupUtils = require('./lib/open_groups.js')
+const openGroupUtilsV2 = require('./lib/open_group_v2.js')
 const keyUtil = require('./external/mnemonic/index.js')
 
 /**
@@ -75,14 +77,15 @@ class SessionClient extends EventEmitter {
    */
   constructor(options = {}) {
     super()
-    this.pollRate = options.pollRate || 3000
+    this.pollRate = options.pollRate || 30000
     this.lastHash = options.lastHash || ''
     this.homeServer = options.homeServer || FILESERVER_URL
     this.fileServerToken = options.fileServerToken || ''
     this.displayName = options.displayName || false
     this.openGroupServers = {}
+    this.openGroupV2Servers = {}
     this.pollServer = false
-    this.groupInviteTextTemplate = '{pubKey} has invited you to join {name} at {url}'
+    this.groupInviteTextTemplate = '{pubKey} has invited you to join {name} at'
     this.groupInviteNonC1TextTemplate = ' You may not be able to join this channel if you are using a mobile session client'
     this.lastPoll = 0
   }
@@ -130,6 +133,8 @@ class SessionClient extends EventEmitter {
       this.identityOutput = 'SessionID ' + res.keypair.pubKey.toString('hex') + ' seed words: ' + res.words
       options.keypair = res.keypair
     }
+    // ensure hexstr
+    options.keypair.publicKeyHex = options.keypair.pubKey.toString('hex')
     if (options.displayName) {
       this.displayName = options.displayName
     }
@@ -221,7 +226,7 @@ class SessionClient extends EventEmitter {
       // if you missed 10 polls in a roll
       if (ago > this.pollRate * 10 * 5) {
         this.lastPoll = Date.now() // prevent amplification
-        console.warn('SessionClient::watchdog - polling failure, restarting poller', ago, this.pollRate)
+        console.warn('SessionClient::watchdog - polling failure, would restart poller', ago, this.pollRate)
         //this.poll()
       }
     }
@@ -259,10 +264,12 @@ class SessionClient extends EventEmitter {
       }
       return undefined
     }))).filter((m) => !!m)
+    const v2GroupResults = await openGroupUtilsV2.SessionOpenGroupV2Manager.getMessages()
+    //console.log('v2GroupResults', v2GroupResults)
 
     if (this.debugTimer) console.log('polled...', this.ourPubkeyHex)
-    if (dmResult || groupResults.length > 0) {
-      const messages = []
+    if (dmResult || groupResults.length > 0 || v2GroupResults.length > 0) {
+      const messages = v2GroupResults
       if (dmResult) {
         if (dmResult.lastHash !== this.lastHash) {
           /**
@@ -304,12 +311,21 @@ class SessionClient extends EventEmitter {
               this.emit('typingMessage', msg)
             } else
             if (msg.receiptMessage) {
+              // msg.recieptMessage.timestamp is an array of unsigned protobuf longs..
               /**
                    * Read Receipt message
                    * @event SessionClient#receiptMessage
                    * @type messageCallback
                    */
               this.emit('receiptMessage', msg)
+            } else
+            if (msg.configurationMessage) {
+              /**
+                   * Multidevice config message
+                   * @event SessionClient#configurationMessage
+                   * @type messageCallback
+                   */
+              this.emit('configurationMessage', msg)
             } else
             if (msg.nullMessage) {
               /**
@@ -328,6 +344,7 @@ class SessionClient extends EventEmitter {
           groupResults.forEach(group => group.groupMessages.forEach(message => {
             // Exclude our own messages
             if (message.user.username !== this.ourPubkeyHex) {
+              // FIXME: quotes? attachments?
               messages.push({
                 openGroup: group.openGroup,
                 body: message.text,
@@ -340,7 +357,6 @@ class SessionClient extends EventEmitter {
             }
           }))
         }
-
         if (messages.length) {
           /**
            * content dataMessage protobuf
@@ -531,7 +547,12 @@ class SessionClient extends EventEmitter {
         profileKeyBuf: this.profileKeyBuf
       }
     }
-    return this.sendLib.send(destination, this.keypair, messageTextBody, lib, sendOptions)
+    try {
+      return this.sendLib.send(destination, this.keypair, messageTextBody, lib, sendOptions)
+    } catch (e) {
+      console.error('session-client::send - exception', e)
+    }
+    return false
   }
 
   /**
@@ -578,35 +599,9 @@ class SessionClient extends EventEmitter {
       msg += this.groupInviteNonC1TextTemplate
     }
     await this.send(destination, msg)
+    // send the URL separately...
+    await this.send(destination, serverAddress)
     return this.sendOpenGroupInvite(destination, serverName, serverAddress, channelId)
-  }
-
-  /**
-   * Request a session reset
-   * @public
-   * @param {String} destination pubkey of who you want to send to
-   * @returns {Promise&lt;Bool>} If operation was successful or not
-   * @example
-   * sessionClient.sendSessionReset('05d233c6c8daed63a48dfc872a6602512fd5a18fc764a6d75a08b9b25e7562851a')
-   */
-  async sendSessionReset(destination) {
-    return this.sendLib.send(destination, this.keypair, 'TERMINATE', lib, {
-      flags: 1
-    })
-  }
-
-  /**
-   * Respond that session has been established
-   * @public
-   * @param {String} destination pubkey of who you want to send to
-   * @returns {Promise&lt;Bool>} If operation was successful or not
-   * @example
-   * sessionClient.sendSessionEstablished('05d233c6c8daed63a48dfc872a6602512fd5a18fc764a6d75a08b9b25e7562851a')
-   */
-  async sendSessionEstablished(destination) {
-    return this.sendLib.send(destination, this.keypair, '', lib, {
-      nullMessage: true
-    })
   }
 
   /**
@@ -644,6 +639,34 @@ class SessionClient extends EventEmitter {
   }
 
   /**
+   * Join Open Group V2, Receive Open Group V2 token
+   * @public
+   * @param {String} open group handle
+   * @param {Number} open group Channel
+   * @returns {Promise&lt;Object>} Object {token: {String}, channelId: {Int}, lastMessageId: {Int}}
+   * @example
+   * sessionClient.joinOpenGroup('chat.getsession.org')
+   */
+  async joinOpenGroupV2(openGroupURL, options = {}) {
+    console.log('Joining Open Group V2', openGroupURL)
+
+    // parre URL into parts
+    const urlDetails = new urlparser.URL(openGroupURL)
+    //console.log('urlDetails', urlDetails)
+    const baseUrl = urlDetails.protocol + '//' + urlDetails.host
+    const room = urlDetails.pathname.substr(1).toString()
+    const serverPubkeyHex = urlDetails.searchParams.get('public_key')
+
+    // ensure room
+    const roomObj = openGroupUtilsV2.SessionOpenGroupV2Manager.joinServerRoom(
+      baseUrl, serverPubkeyHex, this.keypair, room, options)
+    // get token, so we can get initial messages
+    roomObj.ensureToken()
+    // return handle
+    return roomObj
+  }
+
+  /**
    * Send Open Group Message
    * @public
    * @param {String} open group URL (without protocol)
@@ -667,9 +690,23 @@ class SessionClient extends EventEmitter {
   }
 
   /**
+   * Send Open Group V2 Message
+   * @public
+   * @param {String} open group handle
+   * @param {String} message text body
+   * @param {Object} additional options - not yet implemented
+   * @returns {Promise&lt;Int>} ID of sent message, zero if not successfully sent
+   * @example
+   * sessionClient.joinOpenGroup('chat.getsession.org')
+   */
+  async sendOpenGroupV2Message(roomObj, messageTextBody, options = {}) {
+    return roomObj.send(messageTextBody, options)
+  }
+
+  /**
      * Delete Open Group Message
      * @public
-     * @param {String} open group URL (without protocol)
+     * @param {String} open group handle (without protocol)
      * @param {Array&lt;Int>} array of message IDs to delete
      * @returns {Promise&lt;Object>} result of deletion
      * @example
@@ -687,6 +724,23 @@ class SessionClient extends EventEmitter {
     const deleteMessageResult = await this.openGroupServers[openGroup].messageDelete(messageIds)
     return deleteMessageResult
   }
+
+  /**
+     * Delete Open Group V2 Message
+     * @public
+     * @param {String} open group V2 handle
+     * @param {Int} message ID to delete
+     * @returns {Promise&lt;Array>} result of deletion (false, null or true)
+     * @example
+     * sessionClient.joinOpenGroup('chat.getsession.org')
+     */
+  deleteOpenGroupV2Message(roomObj, messageIds) {
+    if (!Array.isArray(messageIds)) { messageIds = [messageIds] }
+    // fire them all off in parallel
+    return Promise.all(messageIds.map(id => {
+      return roomObj.messageDelete(id)
+    }))
+  }
 }
 
 module.exports = SessionClient
@@ -700,13 +754,13 @@ module.exports = SessionClient
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-lns.html">lns</a></li><li><a href="module-session-client.html">session-client</a></li></ul><h3>Classes</h3><ul><li><a href="module-session-client-SessionClient.html">SessionClient</a></li></ul><h3>Events</h3><ul><li><a href="SessionClient.html#event:fileServerToken">fileServerToken</a></li><li><a href="SessionClient.html#event:messages">messages</a></li><li><a href="SessionClient.html#event:nullMessage">nullMessage</a></li><li><a href="SessionClient.html#event:receiptMessage">receiptMessage</a></li><li><a href="SessionClient.html#event:typingMessage">typingMessage</a></li><li><a href="SessionClient.html#event:updateLastHash">updateLastHash</a></li></ul><h3>Global</h3><ul><li><a href="global.html#FILESERVER_URL">FILESERVER_URL</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-lns.html">lns</a></li><li><a href="module-session-client.html">session-client</a></li></ul><h3>Classes</h3><ul><li><a href="module-session-client-SessionClient.html">SessionClient</a></li></ul><h3>Events</h3><ul><li><a href="SessionClient.html#event:configurationMessage">configurationMessage</a></li><li><a href="SessionClient.html#event:fileServerToken">fileServerToken</a></li><li><a href="SessionClient.html#event:messages">messages</a></li><li><a href="SessionClient.html#event:nullMessage">nullMessage</a></li><li><a href="SessionClient.html#event:receiptMessage">receiptMessage</a></li><li><a href="SessionClient.html#event:typingMessage">typingMessage</a></li><li><a href="SessionClient.html#event:updateLastHash">updateLastHash</a></li></ul><h3>Global</h3><ul><li><a href="global.html#FILESERVER_URL">FILESERVER_URL</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.6</a> on Sun Jan 24 2021 16:45:58 GMT+0000 (Coordinated Universal Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.6</a> on Mon May 10 2021 03:21:44 GMT-0700 (Pacific Daylight Time)
 </footer>
 
 <script> prettyPrint(); </script>
