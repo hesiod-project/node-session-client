@@ -37,13 +37,12 @@ client.loadIdentity({
   // handle incoming messages
   client.on('messages', msgs => {
     msgs.forEach(async msg => {
-      console.log()
       /*
       if (msg.openGroup) {
         console.log(`New message, In group: ${msg.openGroup}`)
       } else */
-      if (msg.openGroupV2) {
-        console.log(`New message, In group V2: ${msg.openGroupV2}`)
+      if (msg.room) {
+        console.log(`New message, In group V2: ${msg.id} in ${msg.room}`)
       } else {
         console.log('New message, Private')
       }
