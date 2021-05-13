@@ -198,7 +198,11 @@ class SessionClient extends EventEmitter {
       // if you missed 10 polls in a roll
       if (ago > this.pollRate * 10 * 5) {
         this.lastPoll = Date.now() // prevent amplification
-        console.warn('SessionClient::watchdog - polling failure, would restart poller', ago, this.pollRate)
+        // this scrolls off any error right now
+        if (!this.watchdogSent > 3) {
+          console.warn('SessionClient::watchdog - polling failure, would restart poller', ago, this.pollRate)
+          this.watchdogSent++
+        }
         //this.poll()
       }
     }
@@ -227,6 +231,22 @@ class SessionClient extends EventEmitter {
     const dmResult = await this.recvLib.checkBox(
       this.ourPubkeyHex, this.keypair, this.lastHash, lib, this.debugTimer
     )
+    // commit the lastHash as soon as possible
+    if (dmResult && dmResult.lastHash !== this.lastHash) {
+      /**
+       * Handle when the cursor in the pubkey's inbox moves
+       * @callback updateLastHashCallback
+       * @param {String} hash The last hash returns from the storage server for this pubkey
+       */
+      /**
+       * Exposes the last hash, so you can persist between reloads where you left off
+       * and not process commands twice
+       * @event SessionClient#updateLastHash
+       * @type updateLastHashCallback
+       */
+      this.emit('updateLastHash', dmResult.lastHash)
+      this.lastHash = dmResult.lastHash
+    }
     const groupResults = (await Promise.all(Object.keys(this.openGroupServers).map(async (openGroup) => {
       //console.log('poll - polling open group', openGroup, this.openGroupServers[openGroup])
       //console.log('poll - open group token', this.openGroupServers[openGroup].token)
@@ -243,21 +263,6 @@ class SessionClient extends EventEmitter {
     if (dmResult || groupResults.length > 0 || v2GroupResults.length > 0) {
       const messages = v2GroupResults
       if (dmResult) {
-        if (dmResult.lastHash !== this.lastHash) {
-          /**
-           * Handle when the cursor in the pubkey's inbox moves
-           * @callback updateLastHashCallback
-           * @param {String} hash The last hash returns from the storage server for this pubkey
-           */
-          /**
-           * Exposes the last hash, so you can persist between reloads where you left off
-           * and not process commands twice
-           * @event SessionClient#updateLastHash
-           * @type updateLastHashCallback
-           */
-          this.emit('updateLastHash', dmResult.lastHash)
-          this.lastHash = dmResult.lastHash
-        }
         if (dmResult.messages.length) {
           // emit them...
 
@@ -275,6 +280,9 @@ class SessionClient extends EventEmitter {
               }
             } else
             if (msg.typingMessage) {
+              // timestamp, action: 0
+              // snodeExp/source
+              //console.log('typingMessage', msg)
               /**
                    * Typing message
                    * @event SessionClient#typingMessage
@@ -284,6 +292,7 @@ class SessionClient extends EventEmitter {
             } else
             if (msg.receiptMessage) {
               // msg.recieptMessage.timestamp is an array of unsigned protobuf longs..
+              //console.log(msg.source, 'receiptMessage', msg.receiptMessage.type, msg.receiptMessage.timestamp, msg.snodeExp)
               /**
                    * Read Receipt message
                    * @event SessionClient#receiptMessage
@@ -300,6 +309,7 @@ class SessionClient extends EventEmitter {
               this.emit('configurationMessage', msg)
             } else
             if (msg.nullMessage) {
+              console.log('nullMessage', msg)
               /**
                      * session established message
                      * @event SessionClient#nullMessage
@@ -360,6 +370,20 @@ class SessionClient extends EventEmitter {
   close() {
     if (this.debugTimer) console.log('closing')
     this.pollServer = false
+  }
+
+  async getLastHashFromSwarm() {
+    const pubKey = this.ourPubkeyHex
+    const url = await lib.getSwarmsnodeUrl(pubKey)
+    const messageData = await lib.pubKeyAsk(url, 'retrieve', pubKey, {
+      lastHash: this.lastHash
+    })
+    //console.log('getLastHashFromSwarm', messageData)
+    if (!messageData.messages || !messageData.messages.length) {
+      return undefined
+    }
+    const lastMsg = messageData.messages.pop()
+    return lastMsg.hash
   }
 
   /**
@@ -551,6 +575,7 @@ class SessionClient extends EventEmitter {
 
   /**
    * Send an open group invite with additional text for mobile
+   * seems to work with V2 (leave channel as 1)
    * @public
    * @param {String} destination pubkey of who you want to send to
    * @param {String} serverName Server description
@@ -564,7 +589,8 @@ class SessionClient extends EventEmitter {
     // FIXME: maybe send a text with this
     channelId = parseInt(channelId)
     // this.groupInviteTextTemplate = '{pubKey} has invited you to join {name} at {url}'
-    let msg = this.groupInviteTextTemplate.replace(/{pubKey}/g, this.ourPubkeyHex)
+    let msg = this.groupInviteTextTemplate
+    msg = msg.replace(/{pubKey}/g, this.ourPubkeyHex)
     msg = msg.replace(/{name}/g, serverName)
     msg = msg.replace(/{url}/g, serverAddress)
     if (channelId !== 1) {
@@ -630,7 +656,7 @@ class SessionClient extends EventEmitter {
     const serverPubkeyHex = urlDetails.searchParams.get('public_key')
 
     // ensure room
-    const roomObj = openGroupUtilsV2.SessionOpenGroupV2Manager.joinServerRoom(
+    const roomObj = await openGroupUtilsV2.SessionOpenGroupV2Manager.joinServerRoom(
       baseUrl, serverPubkeyHex, this.keypair, room, options)
     // get token, so we can get initial messages
     roomObj.ensureToken()
