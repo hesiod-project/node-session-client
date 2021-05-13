@@ -27,18 +27,14 @@
   },
   "homepage": "https://github.com/neuroscr/node-session-client#readme",
   "dependencies": {
-    "@peculiar/webcrypto": "^1.1.3",
     "buffer-crc32": "^0.2.13",
     "bytebuffer": "^5.0.1",
     "curve25519-n": "^1.5.0",
     "form-data": "^3.0.0",
-    "isomorphic-webcrypto": "^2.3.6",
-    "jsbi": "^3.1.3",
     "libsignal": "^2.0.1",
     "libsodium-wrappers": "^0.7.8",
     "node-fetch": "^2.6.1",
-    "protobufjs": "^6.10.1",
-    "request": "^2.88.2"
+    "protobufjs": "^6.10.1"
   },
   "devDependencies": {
     "eslint": "^7.6.0",
