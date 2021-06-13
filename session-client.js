@@ -22,7 +22,8 @@ const FILESERVERV2_PUBKEY = 'da21e1d886c6fbaea313f75298bd64aab03a97ce985b46bb2da
  * @property {Number} pollRate How much delay between poll requests
  * @property {Number} lastHash Poll for messages from this hash on
  * @property {String} displayName Send messages with this profile name
- * @property {String} homeServer HTTPS URL for this identity's file server
+ * @property {String} homeServer URL for this identity's file server
+ * @property {String} homeServerPubKey Pubkey in hex for this identity's file server
  * @property {String} identityOutput human readable string with seed words if generated a new identity
  * @property {String} ourPubkeyHex This identity's pubkey (SessionID)
  * @property {object} keypair This identity's keypair buffers
