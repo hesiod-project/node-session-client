@@ -9,11 +9,11 @@ Supports
 - Recovery Phrase (13 words)
 - Support for communicating with the Loki 9.x network
 - Desktop open-group invitations
-- open groups
+- open groups / fileserver (now deprecated)
 - open groups v2
+- file server v2
 
 Working on:
-- file server v2
 - bugs / error codes
 - closed group support
 - relying on less 3rd party NPMs (for security reasons)
