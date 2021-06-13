@@ -392,7 +392,9 @@ class SessionClient extends EventEmitter {
     return Promise.all(msg.attachments.map(async attachment => {
       // attachment.key
       // could check digest too (should do that inside decryptCBC tho)
-      const res = await attachemntUtils.downloadEncryptedAttachment(attachment.url, attachment.key)
+      // hack around session support for multiple servers
+      const options = { pubkey: this.homeServerPubKey }
+      const res = await attachemntUtils.downloadEncryptedAttachment(attachment.url, attachment.key, options)
       //console.log('attachmentRes', res)
       return res
     }))
