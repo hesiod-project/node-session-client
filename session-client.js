@@ -13,7 +13,8 @@ const keyUtil = require('./external/mnemonic/index.js')
  * @constant
  * @default
  */
-const FILESERVER_URL = 'https://file.getsession.org/' // path required!
+const FILESERVERV2_URL = 'http://filev2.getsession.org' // no trailing slash for v2
+const FILESERVERV2_PUBKEY = 'da21e1d886c6fbaea313f75298bd64aab03a97ce985b46bb2dad9f2089c8ee59'
 
 /**
  * Creates a new Session client
@@ -22,7 +23,6 @@ const FILESERVER_URL = 'https://file.getsession.org/' // path required!
  * @property {Number} lastHash Poll for messages from this hash on
  * @property {String} displayName Send messages with this profile name
  * @property {String} homeServer HTTPS URL for this identity's file server
- * @property {String} fileServerToken Token for avatar operations
  * @property {String} identityOutput human readable string with seed words if generated a new identity
  * @property {String} ourPubkeyHex This identity's pubkey (SessionID)
  * @property {object} keypair This identity's keypair buffers
@@ -51,8 +51,8 @@ class SessionClient extends EventEmitter {
     super()
     this.pollRate = options.pollRate || 30000
     this.lastHash = options.lastHash || ''
-    this.homeServer = options.homeServer || FILESERVER_URL
-    this.fileServerToken = options.fileServerToken || ''
+    this.homeServer = options.homeServer || FILESERVERV2_URL
+    this.homeServerPubKey = options.homeServerPubkey || FILESERVERV2_PUBKEY
     this.displayName = options.displayName || false
     this.openGroupServers = {}
     this.openGroupV2Servers = {}
@@ -116,35 +116,8 @@ class SessionClient extends EventEmitter {
     // we need ourPubkeyHex set
     if (options.avatarFile) {
       if (fs.existsSync(options.avatarFile)) {
-        let avatarOk = false
+        const avatarOk = false
         const avatarDisk = fs.readFileSync(options.avatarFile)
-        // is this image uploaded to the server?
-        const avatarRes = await attachemntUtils.getAvatar(FILESERVER_URL,
-          this.ourPubkeyHex
-        )
-        if (!avatarRes) {
-          // false just means not set
-          if (avatarRes === undefined) {
-            console.warn('SessionClient::loadIdentity - getAvatar failure', avatarRes)
-          }
-        } else {
-          this.encAvatarUrl = avatarRes.url
-          this.profileKeyBuf = Buffer.from(avatarRes.profileKey64, 'base64')
-          const netData = await attachemntUtils.downloadEncryptedAvatar(
-            this.encAvatarUrl, this.profileKeyBuf
-          )
-          if (!netData) {
-            console.warn('SessionClient::loadIdentity - downloadEncryptedAvatar failure', netData)
-          } else {
-            if (avatarDisk.byteLength !== netData.byteLength ||
-              Buffer.compare(avatarDisk, netData) !== 0) {
-              console.log('SessionClient::loadIdentity - detected avatar change, replacing')
-              await this.changeAvatar(avatarDisk)
-            } else {
-              avatarOk = true
-            }
-          }
-        }
         if (!avatarOk) {
           console.log('SessionClient::loadIdentity - unable to read avatar state, resetting avatar')
           await this.changeAvatar(avatarDisk)
@@ -436,50 +409,18 @@ class SessionClient extends EventEmitter {
   }
 
   /**
-   * get file server token for avatar operations
-   * @private
-   * @fires SessionClient#fileServerToken
-   */
-  async ensureFileServerToken() {
-    if (!this.fileServerToken) {
-      // we need a token...
-      if (!this.homeServer) {
-        console.trace('ensureFileServerToken - No home server set')
-        return
-      }
-      this.fileServerToken = await attachemntUtils.getToken(
-        this.homeServer, this.keypair.privKey, this.ourPubkeyHex
-      )
-      /**
-       * Handle when we get a new home server token
-       * @callback fileServerTokenCallback
-       * @param {string} token The new token for their home server
-       */
-      /**
-       * Exposes identity's home server token, to speed up start up
-       * @event SessionClient#fileServerToken
-       * @type fileServerTokenCallback
-       */
-      this.emit('fileServerToken', this.fileServerToken)
-    }
-    // else maybe verify token
-  }
-
-  /**
    * Change your avatar
    * @public
    * @param {Buffer} data image data
    * @return {Promise<object>} avatar's URL and profileKey to decode
-   * @uses ensureFileServerToken
    */
   async changeAvatar(data) {
     if (!this.ourPubkeyHex) {
       console.error('SessionClient::changeAvatar - Identity not set up yet')
       return
     }
-    await this.ensureFileServerToken()
     const res = await attachemntUtils.uploadEncryptedAvatar(
-      this.homeServer, this.fileServerToken, this.ourPubkeyHex, data)
+      this.homeServer, this.homeServerPubKey, data)
     //console.log('SessionClient::changeAvatar - res', res)
     /* profileKeyBuf: buffer
       url: string */
@@ -500,18 +441,9 @@ class SessionClient extends EventEmitter {
    */
   async decodeAvatar(url, profileKeyUint8) {
     const buf = Buffer.from(profileKeyUint8)
-    return attachemntUtils.downloadEncryptedAvatar(url, buf)
-  }
-
-  /**
-   * get any one's avatar
-   * @public
-   * @param {String} url User's home server URL
-   * @param {String} pubkeyHex Who's avatar you want
-   * @returns {Promise<Buffer>} a buffer containing raw binary data for image of avatar
-   */
-  async getAvatar(fSrvUrl, pubkeyHex) {
-    return attachemntUtils.downloadEncryptedAvatar(fSrvUrl, pubkeyHex)
+    // hack around session support for multiple servers
+    const options = { pubkey: this.homeServerPubKey }
+    return attachemntUtils.downloadEncryptedAvatar(url, buf, options)
   }
 
   /**
