@@ -4,7 +4,6 @@ const EventEmitter = require('events')
 
 const lib = require('./lib/lib.js')
 const attachemntUtils = require('./lib/attachments.js')
-const openGroupUtils = require('./lib/open_groups.js')
 const openGroupUtilsV2 = require('./lib/open_group_v2.js')
 const keyUtil = require('./external/mnemonic/index.js')
 
@@ -536,40 +535,6 @@ class SessionClient extends EventEmitter {
   }
 
   /**
-   * Join Open Group, Receive Open Group token
-   * @public
-   * @todo also accept with protocol for .loki support
-   * @param {String} open group URL (without protocol)
-   * @param {Number} open group Channel
-   * @returns {Promise<Object>} Object {token: {String}, channelId: {Int}, lastMessageId: {Int}}
-   * @example
-   * sessionClient.joinOpenGroup('chat.getsession.org')
-   */
-  async joinOpenGroup(openGroupURL, channelId = 1) {
-    console.log('Joining Open Group', openGroupURL)
-    const id = openGroupURL + '_' + channelId
-    this.openGroupServers[id] = new openGroupUtils.SessionOpenGroupChannel(openGroupURL, {
-      channelId: channelId,
-      keypair: this.keypair,
-    })
-    // FIXME failure condition?
-    this.openGroupServers[id].token = await openGroupUtils.getToken(openGroupURL,
-      this.keypair.privKey, this.ourPubkeyHex)
-
-    const subscriptionResult = await this.openGroupServers[id].subscribe()
-    this.openGroupServers[id].lastId = subscriptionResult && subscriptionResult.data && subscriptionResult.data.recent_message_id
-
-    // stay backwards compatible
-    return {
-      token: this.openGroupServers[id].token,
-      channelId: channelId,
-      lastMessageId: this.openGroupServers[id].lastId,
-      handle: this.openGroupServers[id],
-      id: id // best to pass to other functions...
-    }
-  }
-
-  /**
    * Join Open Group V2, Receive Open Group V2 token
    * @public
    * @param {String} open group handle
@@ -598,29 +563,6 @@ class SessionClient extends EventEmitter {
   }
 
   /**
-   * Send Open Group Message
-   * @public
-   * @param {String} open group URL (without protocol)
-   * @param {String} message text body
-   * @param {Object} additional options - not yet implemented
-   * @returns {Promise<Int>} ID of sent message, zero if not successfully sent
-   * @example
-   * sessionClient.joinOpenGroup('chat.getsession.org')
-   */
-  async sendOpenGroupMessage(openGroup, messageTextBody, options = {}) {
-    // attempt to be backwards compatible
-    if (!this.openGroupServers[openGroup]) {
-      openGroup = openGroup.replace('_1', '')
-    }
-    if (!this.openGroupServers[openGroup]) {
-      console.error('sendOpenGroupMessage - no such openGroup', openGroup)
-      return false
-    }
-    const sendMessageResult = await this.openGroupServers[openGroup].send(messageTextBody)
-    return sendMessageResult
-  }
-
-  /**
    * Send Open Group V2 Message
    * @public
    * @param {String} open group handle
@@ -632,28 +574,6 @@ class SessionClient extends EventEmitter {
    */
   async sendOpenGroupV2Message(roomObj, messageTextBody, options = {}) {
     return roomObj.send(messageTextBody, options)
-  }
-
-  /**
-     * Delete Open Group Message
-     * @public
-     * @param {String} open group handle (without protocol)
-     * @param {Array<Int>} array of message IDs to delete
-     * @returns {Promise<Object>} result of deletion
-     * @example
-     * sessionClient.joinOpenGroup('chat.getsession.org')
-     */
-  async deleteOpenGroupMessage(openGroup, messageIds) {
-    // attempt to be backwards compatible
-    if (!this.openGroupServers[openGroup]) {
-      openGroup = openGroup.replace('_1', '')
-    }
-    if (!this.openGroupServers[openGroup]) {
-      console.error('deleteOpenGroupMessage - no such openGroup', openGroup)
-      return false
-    }
-    const deleteMessageResult = await this.openGroupServers[openGroup].messageDelete(messageIds)
-    return deleteMessageResult
   }
 
   /**
