@@ -214,6 +214,6 @@ for (const [language, prefix_len] of Object.entries(languages)) {
   } else {
     // browser
     // should be already set
-    //window['adnServerAPI'] = adnServerAPI
+    //window['crc32'] =
   }
 })(typeof (module) === 'undefined' ? this : module)
