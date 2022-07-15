@@ -473,7 +473,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line451">line 451</a>
+        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line417">line 417</a>
     </li></ul></dd>
     
 
@@ -583,7 +583,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line360">line 360</a>
+        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line343">line 343</a>
     </li></ul></dd>
     
 
@@ -743,7 +743,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line477">line 477</a>
+        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line442">line 442</a>
     </li></ul></dd>
     
 
@@ -792,193 +792,6 @@
     
 
 
-
-
-
-        
-            
-
-    
-
-    
-    <h4 class="name" id="deleteOpenGroupMessage"><span class="type-signature">(async) </span>deleteOpenGroupMessage<span class="signature">(open, array)</span><span class="type-signature"> &rarr; {Promise.&lt;Object>}</span></h4>
-    
-
-    
-
-
-
-<div class="description">
-    Delete Open Group Message
-</div>
-
-
-
-
-
-
-
-
-
-    <h5>Parameters:</h5>
-    
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>open</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">String</span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">group handle (without protocol)</td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>array</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">Array.&lt;Int></span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">of message IDs to delete</td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line687">line 687</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<h5>Returns:</h5>
-
-        
-<div class="param-desc">
-    result of deletion
-</div>
-
-
-
-<dl>
-    <dt>
-        Type
-    </dt>
-    <dd>
-        
-<span class="param-type">Promise.&lt;Object></span>
-
-
-    </dd>
-</dl>
-
-    
-
-
-
-
-    <h5>Example</h5>
-    
-    <pre class="prettyprint"><code>sessionClient.joinOpenGroup('chat.getsession.org')</code></pre>
 
 
 
@@ -1112,7 +925,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line709">line 709</a>
+        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line588">line 588</a>
     </li></ul></dd>
     
 
@@ -1276,7 +1089,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line371">line 371</a>
+        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line368">line 368</a>
     </li></ul></dd>
     
 
@@ -1325,382 +1138,6 @@
     
 
 
-
-
-
-        
-            
-
-    
-
-    
-    <h4 class="name" id="getAvatar"><span class="type-signature">(async) </span>getAvatar<span class="signature">(url, pubkeyHex)</span><span class="type-signature"> &rarr; {Promise.&lt;Buffer>}</span></h4>
-    
-
-    
-
-
-
-<div class="description">
-    get any one's avatar
-</div>
-
-
-
-
-
-
-
-
-
-    <h5>Parameters:</h5>
-    
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>url</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">String</span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">User's home server URL</td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>pubkeyHex</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">String</span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">Who's avatar you want</td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line489">line 489</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<h5>Returns:</h5>
-
-        
-<div class="param-desc">
-    a buffer containing raw binary data for image of avatar
-</div>
-
-
-
-<dl>
-    <dt>
-        Type
-    </dt>
-    <dd>
-        
-<span class="param-type">Promise.&lt;Buffer></span>
-
-
-    </dd>
-</dl>
-
-    
-
-
-
-
-
-        
-            
-
-    
-
-    
-    <h4 class="name" id="joinOpenGroup"><span class="type-signature">(async) </span>joinOpenGroup<span class="signature">(open, open)</span><span class="type-signature"> &rarr; {Promise.&lt;Object>}</span></h4>
-    
-
-    
-
-
-
-<div class="description">
-    Join Open Group, Receive Open Group token
-</div>
-
-
-
-
-
-
-
-
-
-    <h5>Parameters:</h5>
-    
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>open</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">String</span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">group URL (without protocol)</td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>open</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">Number</span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">group Channel</td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line589">line 589</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-    <dt class="tag-todo">To Do:</dt>
-    <dd class="tag-todo">
-        <ul>
-            <li>also accept with protocol for .loki support</li>
-        </ul>
-    </dd>
-    
-</dl>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<h5>Returns:</h5>
-
-        
-<div class="param-desc">
-    Object {token: {String}, channelId: {Int}, lastMessageId: {Int}}
-</div>
-
-
-
-<dl>
-    <dt>
-        Type
-    </dt>
-    <dd>
-        
-<span class="param-type">Promise.&lt;Object></span>
-
-
-    </dd>
-</dl>
-
-    
-
-
-
-
-    <h5>Example</h5>
-    
-    <pre class="prettyprint"><code>sessionClient.joinOpenGroup('chat.getsession.org')</code></pre>
 
 
 
@@ -1834,7 +1271,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line622">line 622</a>
+        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line546">line 546</a>
     </li></ul></dd>
     
 
@@ -2379,7 +1816,7 @@ sets this.identityOutput
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line410">line 410</a>
+        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line407">line 407</a>
     </li></ul></dd>
     
 
@@ -2489,7 +1926,7 @@ sets this.identityOutput
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line162">line 162</a>
+        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line135">line 135</a>
     </li></ul></dd>
     
 
@@ -2577,7 +2014,7 @@ sets this.identityOutput
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line220">line 220</a>
+        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line197">line 197</a>
     </li></ul></dd>
     
 
@@ -3029,7 +2466,7 @@ sets this.identityOutput
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line509">line 509</a>
+        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line465">line 465</a>
     </li></ul></dd>
     
 
@@ -3263,7 +2700,7 @@ Currently works on desktop not on iOS/Android
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line542">line 542</a>
+        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line498">line 498</a>
     </li></ul></dd>
     
 
@@ -3317,216 +2754,6 @@ Currently works on desktop not on iOS/Android
     <h5>Example</h5>
     
     <pre class="prettyprint"><code>sessionClient.sendOpenGroupInvite('05d233c6c8daed63a48dfc872a6602512fd5a18fc764a6d75a08b9b25e7562851a', 'Session Chat', 'https://chat.getsession.org/', 1)</code></pre>
-
-
-
-        
-            
-
-    
-
-    
-    <h4 class="name" id="sendOpenGroupMessage"><span class="type-signature">(async) </span>sendOpenGroupMessage<span class="signature">(open, message, additional)</span><span class="type-signature"> &rarr; {Promise.&lt;Int>}</span></h4>
-    
-
-    
-
-
-
-<div class="description">
-    Send Open Group Message
-</div>
-
-
-
-
-
-
-
-
-
-    <h5>Parameters:</h5>
-    
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>open</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">String</span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">group URL (without protocol)</td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>message</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">String</span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">text body</td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>additional</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">Object</span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">options - not yet implemented</td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line651">line 651</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<h5>Returns:</h5>
-
-        
-<div class="param-desc">
-    ID of sent message, zero if not successfully sent
-</div>
-
-
-
-<dl>
-    <dt>
-        Type
-    </dt>
-    <dd>
-        
-<span class="param-type">Promise.&lt;Int></span>
-
-
-    </dd>
-</dl>
-
-    
-
-
-
-
-    <h5>Example</h5>
-    
-    <pre class="prettyprint"><code>sessionClient.joinOpenGroup('chat.getsession.org')</code></pre>
 
 
 
@@ -3683,7 +2910,7 @@ Currently works on desktop not on iOS/Android
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line674">line 674</a>
+        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line575">line 575</a>
     </li></ul></dd>
     
 
@@ -3755,6 +2982,7 @@ Currently works on desktop not on iOS/Android
 
 <div class="description">
     Send an open group invite with additional text for mobile
+seems to work with V2 (leave channel as 1)
 </div>
 
 
@@ -3916,7 +3144,7 @@ Currently works on desktop not on iOS/Android
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line563">line 563</a>
+        <a href="session-client.js.html">session-client.js</a>, <a href="session-client.js.html#line520">line 520</a>
     </li></ul></dd>
     
 
@@ -3989,13 +3217,13 @@ Currently works on desktop not on iOS/Android
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-lns.html">lns</a></li><li><a href="module-session-client.html">session-client</a></li></ul><h3>Classes</h3><ul><li><a href="module-session-client-SessionClient.html">SessionClient</a></li></ul><h3>Events</h3><ul><li><a href="SessionClient.html#event:configurationMessage">configurationMessage</a></li><li><a href="SessionClient.html#event:fileServerToken">fileServerToken</a></li><li><a href="SessionClient.html#event:messages">messages</a></li><li><a href="SessionClient.html#event:nullMessage">nullMessage</a></li><li><a href="SessionClient.html#event:receiptMessage">receiptMessage</a></li><li><a href="SessionClient.html#event:typingMessage">typingMessage</a></li><li><a href="SessionClient.html#event:updateLastHash">updateLastHash</a></li></ul><h3>Global</h3><ul><li><a href="global.html#FILESERVER_URL">FILESERVER_URL</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-lns.html">lns</a></li><li><a href="module-session-client.html">session-client</a></li></ul><h3>Classes</h3><ul><li><a href="module-session-client-SessionClient.html">SessionClient</a></li></ul><h3>Events</h3><ul><li><a href="SessionClient.html#event:configurationMessage">configurationMessage</a></li><li><a href="SessionClient.html#event:messages">messages</a></li><li><a href="SessionClient.html#event:nullMessage">nullMessage</a></li><li><a href="SessionClient.html#event:receiptMessage">receiptMessage</a></li><li><a href="SessionClient.html#event:typingMessage">typingMessage</a></li><li><a href="SessionClient.html#event:updateLastHash">updateLastHash</a></li></ul><h3>Global</h3><ul><li><a href="global.html#FILESERVERV2_URL">FILESERVERV2_URL</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.6</a> on Mon May 10 2021 03:21:44 GMT-0700 (Pacific Daylight Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.6</a> on Sun Jun 13 2021 03:47:51 GMT-0700 (Pacific Daylight Time)
 </footer>
 
 <script> prettyPrint(); </script>

@@ -4,7 +4,6 @@ const EventEmitter = require('events')
 
 const lib = require('./lib/lib.js')
 const attachemntUtils = require('./lib/attachments.js')
-const openGroupUtils = require('./lib/open_groups.js')
 const openGroupUtilsV2 = require('./lib/open_group_v2.js')
 const keyUtil = require('./external/mnemonic/index.js')
 
@@ -13,7 +12,8 @@ const keyUtil = require('./external/mnemonic/index.js')
  * @constant
  * @default
  */
-const FILESERVER_URL = 'https://file.getsession.org/' // path required!
+const FILESERVERV2_URL = 'http://filev2.getsession.org' // no trailing slash for v2
+const FILESERVERV2_PUBKEY = 'da21e1d886c6fbaea313f75298bd64aab03a97ce985b46bb2dad9f2089c8ee59'
 
 /**
  * Creates a new Session client
@@ -21,8 +21,8 @@ const FILESERVER_URL = 'https://file.getsession.org/' // path required!
  * @property {Number} pollRate How much delay between poll requests
  * @property {Number} lastHash Poll for messages from this hash on
  * @property {String} displayName Send messages with this profile name
- * @property {String} homeServer HTTPS URL for this identity's file server
- * @property {String} fileServerToken Token for avatar operations
+ * @property {String} homeServer URL for this identity's file server
+ * @property {String} homeServerPubKey Pubkey in hex for this identity's file server
  * @property {String} identityOutput human readable string with seed words if generated a new identity
  * @property {String} ourPubkeyHex This identity's pubkey (SessionID)
  * @property {object} keypair This identity's keypair buffers
@@ -51,8 +51,8 @@ class SessionClient extends EventEmitter {
     super()
     this.pollRate = options.pollRate || 30000
     this.lastHash = options.lastHash || ''
-    this.homeServer = options.homeServer || FILESERVER_URL
-    this.fileServerToken = options.fileServerToken || ''
+    this.homeServer = options.homeServer || FILESERVERV2_URL
+    this.homeServerPubKey = options.homeServerPubkey || FILESERVERV2_PUBKEY
     this.displayName = options.displayName || false
     this.openGroupServers = {}
     this.openGroupV2Servers = {}
@@ -116,35 +116,8 @@ class SessionClient extends EventEmitter {
     // we need ourPubkeyHex set
     if (options.avatarFile) {
       if (fs.existsSync(options.avatarFile)) {
-        let avatarOk = false
+        const avatarOk = false
         const avatarDisk = fs.readFileSync(options.avatarFile)
-        // is this image uploaded to the server?
-        const avatarRes = await attachemntUtils.getAvatar(FILESERVER_URL,
-          this.ourPubkeyHex
-        )
-        if (!avatarRes) {
-          // false just means not set
-          if (avatarRes === undefined) {
-            console.warn('SessionClient::loadIdentity - getAvatar failure', avatarRes)
-          }
-        } else {
-          this.encAvatarUrl = avatarRes.url
-          this.profileKeyBuf = Buffer.from(avatarRes.profileKey64, 'base64')
-          const netData = await attachemntUtils.downloadEncryptedAvatar(
-            this.encAvatarUrl, this.profileKeyBuf
-          )
-          if (!netData) {
-            console.warn('SessionClient::loadIdentity - downloadEncryptedAvatar failure', netData)
-          } else {
-            if (avatarDisk.byteLength !== netData.byteLength ||
-              Buffer.compare(avatarDisk, netData) !== 0) {
-              console.log('SessionClient::loadIdentity - detected avatar change, replacing')
-              await this.changeAvatar(avatarDisk)
-            } else {
-              avatarOk = true
-            }
-          }
-        }
         if (!avatarOk) {
           console.log('SessionClient::loadIdentity - unable to read avatar state, resetting avatar')
           await this.changeAvatar(avatarDisk)
@@ -419,7 +392,9 @@ class SessionClient extends EventEmitter {
     return Promise.all(msg.attachments.map(async attachment => {
       // attachment.key
       // could check digest too (should do that inside decryptCBC tho)
-      const res = await attachemntUtils.downloadEncryptedAttachment(attachment.url, attachment.key)
+      // hack around session support for multiple servers
+      const options = { pubkey: this.homeServerPubKey }
+      const res = await attachemntUtils.downloadEncryptedAttachment(attachment.url, attachment.key, options)
       //console.log('attachmentRes', res)
       return res
     }))
@@ -436,50 +411,18 @@ class SessionClient extends EventEmitter {
   }
 
   /**
-   * get file server token for avatar operations
-   * @private
-   * @fires SessionClient#fileServerToken
-   */
-  async ensureFileServerToken() {
-    if (!this.fileServerToken) {
-      // we need a token...
-      if (!this.homeServer) {
-        console.trace('ensureFileServerToken - No home server set')
-        return
-      }
-      this.fileServerToken = await attachemntUtils.getToken(
-        this.homeServer, this.keypair.privKey, this.ourPubkeyHex
-      )
-      /**
-       * Handle when we get a new home server token
-       * @callback fileServerTokenCallback
-       * @param {string} token The new token for their home server
-       */
-      /**
-       * Exposes identity's home server token, to speed up start up
-       * @event SessionClient#fileServerToken
-       * @type fileServerTokenCallback
-       */
-      this.emit('fileServerToken', this.fileServerToken)
-    }
-    // else maybe verify token
-  }
-
-  /**
    * Change your avatar
    * @public
    * @param {Buffer} data image data
    * @return {Promise<object>} avatar's URL and profileKey to decode
-   * @uses ensureFileServerToken
    */
   async changeAvatar(data) {
     if (!this.ourPubkeyHex) {
       console.error('SessionClient::changeAvatar - Identity not set up yet')
       return
     }
-    await this.ensureFileServerToken()
     const res = await attachemntUtils.uploadEncryptedAvatar(
-      this.homeServer, this.fileServerToken, this.ourPubkeyHex, data)
+      this.homeServer, this.homeServerPubKey, data)
     //console.log('SessionClient::changeAvatar - res', res)
     /* profileKeyBuf: buffer
       url: string */
@@ -500,18 +443,9 @@ class SessionClient extends EventEmitter {
    */
   async decodeAvatar(url, profileKeyUint8) {
     const buf = Buffer.from(profileKeyUint8)
-    return attachemntUtils.downloadEncryptedAvatar(url, buf)
-  }
-
-  /**
-   * get any one's avatar
-   * @public
-   * @param {String} url User's home server URL
-   * @param {String} pubkeyHex Who's avatar you want
-   * @returns {Promise<Buffer>} a buffer containing raw binary data for image of avatar
-   */
-  async getAvatar(fSrvUrl, pubkeyHex) {
-    return attachemntUtils.downloadEncryptedAvatar(fSrvUrl, pubkeyHex)
+    // hack around session support for multiple servers
+    const options = { pubkey: this.homeServerPubKey }
+    return attachemntUtils.downloadEncryptedAvatar(url, buf, options)
   }
 
   /**
@@ -603,40 +537,6 @@ class SessionClient extends EventEmitter {
   }
 
   /**
-   * Join Open Group, Receive Open Group token
-   * @public
-   * @todo also accept with protocol for .loki support
-   * @param {String} open group URL (without protocol)
-   * @param {Number} open group Channel
-   * @returns {Promise<Object>} Object {token: {String}, channelId: {Int}, lastMessageId: {Int}}
-   * @example
-   * sessionClient.joinOpenGroup('chat.getsession.org')
-   */
-  async joinOpenGroup(openGroupURL, channelId = 1) {
-    console.log('Joining Open Group', openGroupURL)
-    const id = openGroupURL + '_' + channelId
-    this.openGroupServers[id] = new openGroupUtils.SessionOpenGroupChannel(openGroupURL, {
-      channelId: channelId,
-      keypair: this.keypair,
-    })
-    // FIXME failure condition?
-    this.openGroupServers[id].token = await openGroupUtils.getToken(openGroupURL,
-      this.keypair.privKey, this.ourPubkeyHex)
-
-    const subscriptionResult = await this.openGroupServers[id].subscribe()
-    this.openGroupServers[id].lastId = subscriptionResult && subscriptionResult.data && subscriptionResult.data.recent_message_id
-
-    // stay backwards compatible
-    return {
-      token: this.openGroupServers[id].token,
-      channelId: channelId,
-      lastMessageId: this.openGroupServers[id].lastId,
-      handle: this.openGroupServers[id],
-      id: id // best to pass to other functions...
-    }
-  }
-
-  /**
    * Join Open Group V2, Receive Open Group V2 token
    * @public
    * @param {String} open group handle
@@ -665,29 +565,6 @@ class SessionClient extends EventEmitter {
   }
 
   /**
-   * Send Open Group Message
-   * @public
-   * @param {String} open group URL (without protocol)
-   * @param {String} message text body
-   * @param {Object} additional options - not yet implemented
-   * @returns {Promise<Int>} ID of sent message, zero if not successfully sent
-   * @example
-   * sessionClient.joinOpenGroup('chat.getsession.org')
-   */
-  async sendOpenGroupMessage(openGroup, messageTextBody, options = {}) {
-    // attempt to be backwards compatible
-    if (!this.openGroupServers[openGroup]) {
-      openGroup = openGroup.replace('_1', '')
-    }
-    if (!this.openGroupServers[openGroup]) {
-      console.error('sendOpenGroupMessage - no such openGroup', openGroup)
-      return false
-    }
-    const sendMessageResult = await this.openGroupServers[openGroup].send(messageTextBody)
-    return sendMessageResult
-  }
-
-  /**
    * Send Open Group V2 Message
    * @public
    * @param {String} open group handle
@@ -699,28 +576,6 @@ class SessionClient extends EventEmitter {
    */
   async sendOpenGroupV2Message(roomObj, messageTextBody, options = {}) {
     return roomObj.send(messageTextBody, options)
-  }
-
-  /**
-     * Delete Open Group Message
-     * @public
-     * @param {String} open group handle (without protocol)
-     * @param {Array<Int>} array of message IDs to delete
-     * @returns {Promise<Object>} result of deletion
-     * @example
-     * sessionClient.joinOpenGroup('chat.getsession.org')
-     */
-  async deleteOpenGroupMessage(openGroup, messageIds) {
-    // attempt to be backwards compatible
-    if (!this.openGroupServers[openGroup]) {
-      openGroup = openGroup.replace('_1', '')
-    }
-    if (!this.openGroupServers[openGroup]) {
-      console.error('deleteOpenGroupMessage - no such openGroup', openGroup)
-      return false
-    }
-    const deleteMessageResult = await this.openGroupServers[openGroup].messageDelete(messageIds)
-    return deleteMessageResult
   }
 
   /**
