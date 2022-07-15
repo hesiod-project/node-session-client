@@ -29,11 +29,10 @@
   "dependencies": {
     "buffer-crc32": "^0.2.13",
     "bytebuffer": "^5.0.1",
-    "curve25519-n": "^1.5.0",
     "form-data": "^3.0.0",
     "libsignal": "^2.0.1",
     "libsodium-wrappers": "^0.7.8",
-    "node-fetch": "^2.6.1",
+    "node-fetch": "^2.6.7",
     "protobufjs": "^6.10.1"
   },
   "devDependencies": {
