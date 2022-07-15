@@ -1,6 +1,6 @@
 const crypto   = require('crypto')
 const mnemonic = require('./mnemonic.js')
-const curve    = require('curve25519-n')
+//const curve    = require('curve25519-n')
 const _sodium = require('libsodium-wrappers')
 
 const SEEDSIZE = 16 // gives 12 seed words
@@ -25,7 +25,7 @@ function wordsToKeyPairV2(words) {
   // double it
   const seedHex64 = seedHex32.concat(seedHex32).substring(0, 64)
 
-  const priv1 = curve.makeSecretKey(Buffer.from(seedHex64, 'hex'))
+  //const priv1 = curve.makeSecretKey(Buffer.from(seedHex64, 'hex'))
   const publicBuffer = Buffer.concat([Buffer.from('05', 'hex'), curve.derivePublicKey(priv1)])
 
   return {
@@ -75,6 +75,7 @@ async function wordsToKeyPairV3(words) {
   }
 }
 
+// new random one...
 async function newKeypair() {
   const seedBuf = crypto.randomBytes(SEEDSIZE)
   const words = await mnemonic.mn_encode(seedBuf.toString('hex'))
