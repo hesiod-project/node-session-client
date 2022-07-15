@@ -2,7 +2,7 @@
 Implementation of Session protocol in node
 
 Supports
-- Session protocol support
+- Session protocol support (Direct messaging)
 - Recovery Phrase (13 words)
 - Support for communicating with the Loki 10.x network
 
