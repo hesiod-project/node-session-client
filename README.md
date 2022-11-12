@@ -2,18 +2,16 @@
 Implementation of Session protocol in node
 
 Supports
-- Session protocol support
-- Avatars
-- Attachments
-- LNS
+- Session protocol support (Direct messaging)
 - Recovery Phrase (13 words)
-- Support for communicating with the Loki 9.x network
-- Desktop open-group invitations
-- open groups / fileserver (now deprecated)
-- open groups v2
-- file server v2
+- Support for communicating with the Loki 10.x network
 
 Working on:
+- LNS
+- open groups v3
+- file server v3
+- Avatars
+- Attachments
 - bugs / error codes
 - closed group support
 - relying on less 3rd party NPMs (for security reasons)
