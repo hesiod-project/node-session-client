@@ -35,8 +35,12 @@ message Content {
   optional NullMessage    nullMessage    = 4;
   optional ReceiptMessage receiptMessage = 5;
   optional TypingMessage  typingMessage  = 6;
+  optional ConfigurationMessage       configurationMessage       = 7;
+  optional DataExtractionNotification dataExtractionNotification = 8;
+  optional Unsend                     unsendMessage              = 9;
+  optional MessageRequestResponse     messageRequestResponse     = 10;
   optional PreKeyBundleMessage preKeyBundleMessage = 101; // The presence of this indicated that we want to establish a new session (Session Request)
-  optional LokiAddressMessage lokiAddressMessage = 102;
+  optional LokiAddressMessage  lokiAddressMessage = 102;
   optional PairingAuthorisationMessage pairingAuthorisation = 103;
 }
 
@@ -167,6 +171,48 @@ message CallMessage {
   optional Busy      busy      = 5;
 }
 
+message ConfigurationMessage {
+
+  message ClosedGroup {
+    optional bytes   publicKey         = 1;
+    optional string  name              = 2;
+    optional KeyPair encryptionKeyPair = 3;
+    repeated bytes   members           = 4;
+    repeated bytes   admins            = 5;
+  }
+
+  message Contact {
+    // @required
+    required bytes  publicKey         = 1;
+    // @required
+    required string name              = 2;
+    optional string profilePicture    = 3;
+    optional bytes  profileKey        = 4;
+    optional bool   isApproved        = 5;
+    optional bool   isBlocked         = 6;
+    optional bool   didApproveMe      = 7;
+  }
+
+  repeated ClosedGroup closedGroups    = 1;
+  repeated string      openGroups      = 2;
+  optional string      displayName     = 3;
+  optional string      profilePicture  = 4;
+  optional bytes       profileKey      = 5;
+  repeated Contact     contacts        = 6;
+}
+
+message DataExtractionNotification {
+
+  enum Type {
+    SCREENSHOT  = 1; // no way to know this on Desktop
+    MEDIA_SAVED = 2; // timestamp
+  }
+
+  // @required
+  required Type   type      = 1;
+  optional uint64 timestamp = 2;
+}
+
 message DataMessage {
   enum Flags {
     END_SESSION               = 1;
@@ -176,6 +222,20 @@ message DataMessage {
     UNPAIRING_REQUEST         = 128;
   }
 
+  message Reaction {
+    enum Action {
+        REACT = 0;
+        REMOVE = 1;
+    }
+    // @required
+    required uint64 id        = 1; // Message timestamp
+    // @required
+    required string author    = 2;
+    optional string emoji     = 3;
+    // @required
+    required Action action    = 4;
+  }
+
   message Quote {
     message QuotedAttachment {
       optional string            contentType = 1;
@@ -183,7 +243,9 @@ message DataMessage {
       optional AttachmentPointer thumbnail   = 3;
     }
 
+    // @required
     optional uint64           id          = 1;
+    // @required
     optional string           author      = 2;
     optional string           text        = 3;
     repeated QuotedAttachment attachments = 4;
@@ -257,6 +319,7 @@ message DataMessage {
   }
 
   message Preview {
+    // @required
     optional string            url   = 1;
     optional string            title = 2;
     optional AttachmentPointer image = 3;
@@ -266,6 +329,13 @@ message DataMessage {
   message LokiProfile {
     optional string displayName = 1;
     optional string avatar = 2;
+  }
+
+  message OpenGroupInvitation {
+    // @required
+    required string url = 1;
+    // @required
+    required string name = 3;
   }
 
   message GroupInvitation {
@@ -309,10 +379,25 @@ message TypingMessage {
         STARTED = 0;
         STOPPED = 1;
     }
-
-    optional uint64 timestamp = 1;
-    optional Action action    = 2;
+    // @required
+    required uint64 timestamp = 1;
+    // @required
+    required Action action    = 2;
     optional bytes  groupId   = 3;
+}
+
+message Unsend {
+  // @required
+  required uint64 timestamp = 1;
+  // @required
+  required string author    = 2;
+}
+
+message MessageRequestResponse {
+  // @required
+  required bool                      isApproved                = 1;
+  optional bytes                     profileKey                = 2;
+  optional DataMessage.LokiProfile   profile                   = 3;
 }
 
 message Verified {
