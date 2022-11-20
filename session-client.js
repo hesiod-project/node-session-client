@@ -5,6 +5,7 @@ const EventEmitter = require('events')
 const lib = require('./lib/lib.js')
 const attachemntUtils = require('./lib/attachments.js')
 const openGroupUtilsV2 = require('./lib/open_group_v2.js')
+const openGroupUtilsV3 = require('./lib/open_group_v3.js')
 const keyUtil = require('./external/mnemonic/index.js')
 
 /**
@@ -230,11 +231,13 @@ class SessionClient extends EventEmitter {
       return undefined
     }))).filter((m) => !!m)
     const v2GroupResults = await openGroupUtilsV2.SessionOpenGroupV2Manager.getMessages()
-    //console.log('v2GroupResults', v2GroupResults)
+    const v3GroupResults = await openGroupUtilsV3.SessionOpenGroupV3Manager.getMessages()
+    const newerGroupResults = [...v2GroupResults, ...v3GroupResults]
+    //console.debug('newerGroupResults', newerGroupResults.length)
 
     if (this.debugTimer) console.log('polled...', this.ourPubkeyHex)
-    if (dmResult || groupResults.length > 0 || v2GroupResults.length > 0) {
-      const messages = v2GroupResults
+    if (dmResult || groupResults.length > 0 || newerGroupResults.length > 0) {
+      const messages = newerGroupResults
       if (dmResult) {
         if (dmResult.messages.length) {
           // emit them...
@@ -251,6 +254,11 @@ class SessionClient extends EventEmitter {
                 // escalate source
                 messages.push({ ...msg.dataMessage, source: msg.source })
               }
+            } else
+            if (msg.messageRequestResponse) {
+              // messageRequestResponse: { isApproved: true/false }
+              // snodeExp/source/hash
+              this.emit('messageRequestResponse', msg)
             } else
             if (msg.typingMessage) {
               // timestamp, action: 0
@@ -294,38 +302,37 @@ class SessionClient extends EventEmitter {
             }
           })
         }
-
-        if (groupResults.length) {
-          groupResults.forEach(group => group.groupMessages.forEach(message => {
-            // Exclude our own messages
-            if (message.user.username !== this.ourPubkeyHex) {
-              // FIXME: quotes? attachments?
-              messages.push({
-                openGroup: group.openGroup,
-                body: message.text,
-                profile: {
-                  displayName: message.user.name,
-                  avatar: message.user.avatar_image.url,
-                },
-                source: message.user.username,
-              })
-            }
-          }))
-        }
-        if (messages.length) {
-          /**
-           * content dataMessage protobuf
-           * @callback messagesCallback
-           * @param {Array} messages an array of Content protobuf
-           */
-          /**
-           * Messages usually with content
-           * @module session-client
-           * @event SessionClient#messages
-           * @type messagesCallback
-           */
-          this.emit('messages', messages)
-        }
+      }
+      if (groupResults.length) {
+        groupResults.forEach(group => group.groupMessages.forEach(message => {
+          // Exclude our own messages
+          if (message.user.username !== this.ourPubkeyHex) {
+            // FIXME: quotes? attachments?
+            messages.push({
+              openGroup: group.openGroup,
+              body: message.text,
+              profile: {
+                displayName: message.user.name,
+                avatar: message.user.avatar_image.url,
+              },
+              source: message.user.username,
+            })
+          }
+        }))
+      }
+      if (messages.length) {
+        /**
+         * content dataMessage protobuf
+         * @callback messagesCallback
+         * @param {Array} messages an array of Content protobuf
+         */
+        /**
+         * Messages usually with content
+         * @module session-client
+         * @event SessionClient#messages
+         * @type messagesCallback
+         */
+        this.emit('messages', messages)
       }
     }
     this.lastPoll = Date.now()
@@ -548,9 +555,8 @@ class SessionClient extends EventEmitter {
   async joinOpenGroupV2(openGroupURL, options = {}) {
     console.log('Joining Open Group V2', openGroupURL)
 
-    // parre URL into parts
+    // parse URL into parts
     const urlDetails = new urlparser.URL(openGroupURL)
-    //console.log('urlDetails', urlDetails)
     const baseUrl = urlDetails.protocol + '//' + urlDetails.host
     const room = urlDetails.pathname.substr(1).toString()
     const serverPubkeyHex = urlDetails.searchParams.get('public_key')
@@ -558,19 +564,50 @@ class SessionClient extends EventEmitter {
     // ensure room
     const roomObj = await openGroupUtilsV2.SessionOpenGroupV2Manager.joinServerRoom(
       baseUrl, serverPubkeyHex, this.keypair, room, options)
+    // returns false if can't get a token
     // get token, so we can get initial messages
-    roomObj.ensureToken()
+    if (roomObj) {
+      roomObj.ensureToken()
+    }
     // return handle
     return roomObj
   }
 
   /**
+   * Join Open Group V3, Receive Open Group V3 token
+   * @public
+   * @param {String} open group handle
+   * @param {Number} open group Channel
+   * @returns {Promise<Object>} Object {token: {String}, channelId: {Int}, lastMessageId: {Int}}
+   * @example
+   * sessionClient.joinOpenGroupV3('chat.getsession.org')
+   */
+  async joinOpenGroupV3(openGroupURL, options = {}) {
+    console.log('Joining Open Group V3', openGroupURL)
+
+    // parse URL into parts
+    const urlDetails = new urlparser.URL(openGroupURL)
+    const baseUrl = urlDetails.protocol + '//' + urlDetails.host
+    const room = urlDetails.pathname.substr(1).toString()
+    const serverPubkeyHex = urlDetails.searchParams.get('public_key')
+
+    // ensure room
+    const roomObj = await openGroupUtilsV3.SessionOpenGroupV3Manager.joinServerRoom(
+      baseUrl, serverPubkeyHex, this.keypair, room, options)
+    // returns false if can't get a token
+    // get token, so we can get initial messages
+    if (roomObj) {
+      roomObj.ensureToken()
+    }
+    // return handle
+    return roomObj
+  }
+
+
+  /**
    * Send Open Group V2 Message
    * @public
    * @param {String} open group handle
-   * @param {String} message text body
-   * @param {Object} additional options - not yet implemented
-   * @returns {Promise<Int>} ID of sent message, zero if not successfully sent
    * @example
    * sessionClient.joinOpenGroup('chat.getsession.org')
    */
@@ -579,14 +616,25 @@ class SessionClient extends EventEmitter {
   }
 
   /**
-     * Delete Open Group V2 Message
-     * @public
-     * @param {String} open group V2 handle
-     * @param {Int} message ID to delete
-     * @returns {Promise<Array>} result of deletion (false, null or true)
-     * @example
-     * sessionClient.joinOpenGroup('chat.getsession.org')
-     */
+   * Send Open Group V3 Message
+   * @public
+   * @param {String} open group handle
+   * @example
+   * sessionClient.joinOpenGroup('chat.getsession.org')
+   */
+  async sendOpenGroupV3Message(roomObj, messageTextBody, options = {}) {
+    return roomObj.send(messageTextBody, options)
+  }
+
+  /**
+   * Delete Open Group V2 Message
+   * @public
+   * @param {String} open group V2 handle
+   * @param {Int} message ID to delete
+   * @returns {Promise<Array>} result of deletion (false, null or true)
+   * @example
+   * sessionClient.joinOpenGroup('chat.getsession.org')
+   */
   deleteOpenGroupV2Message(roomObj, messageIds) {
     if (!Array.isArray(messageIds)) { messageIds = [messageIds] }
     // fire them all off in parallel
@@ -594,6 +642,20 @@ class SessionClient extends EventEmitter {
       return roomObj.messageDelete(id)
     }))
   }
+
+  /**
+   * Delete Open Group V3 Message
+   * @public
+   * @param {String} open group V3 handle
+   * @param {Int} message ID to delete
+   * @returns {Promise<Array>} result of deletion (false, null or true)
+   * @example
+   * sessionClient.joinOpenGroup('chat.getsession.org')
+   */
+  deleteOpenGroupV3Message(roomObj, messageIds) {
+    return this.deleteOpenGroupV2Message(roomObj, messageIds)
+  }
+
 }
 
 module.exports = SessionClient
