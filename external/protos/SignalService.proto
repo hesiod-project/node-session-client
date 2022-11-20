@@ -15,12 +15,13 @@ message Envelope {
     CLOSED_GROUP_CIPHERTEXT = 7;
     FALLBACK_MESSAGE = 101; // Custom Encryption for when we don't have a session or we need to establish a session
   }
-
-  optional Type   type            = 1;
+  // @required
+  required Type   type            = 1;
   optional string source          = 2;
   optional uint32 sourceDevice    = 7;
   optional string relay           = 3;
-  optional uint64 timestamp       = 5;
+  // @required
+  required uint64 timestamp       = 5;
   optional bytes  legacyMessage   = 6; // Contains an encrypted DataMessage
   optional bytes  content         = 8; // Contains an encrypted Content
   optional string serverGuid      = 9;
@@ -138,37 +139,24 @@ message PreKeyBundleMessage {
 }
 
 message CallMessage {
-  message Offer {
-    optional uint64 id          = 1;
-    optional string description = 2;
+
+  enum Type {
+    PRE_OFFER          = 6;
+    OFFER              = 1;
+    ANSWER             = 2;
+    PROVISIONAL_ANSWER = 3;
+    ICE_CANDIDATES     = 4;
+    END_CALL           = 5;
   }
 
-  message Answer {
-    optional uint64 id          = 1;
-    optional string description = 2;
-  }
+  // @required
+  required Type type              = 1;
+  repeated string sdps            = 2;
+  repeated uint32 sdpMLineIndexes = 3;
+  repeated string sdpMids         = 4;
 
-  message IceUpdate {
-    optional uint64 id            = 1;
-    optional string sdpMid        = 2;
-    optional uint32 sdpMLineIndex = 3;
-    optional string sdp           = 4;
-  }
-
-  message Busy {
-    optional uint64 id = 1;
-  }
-
-  message Hangup {
-    optional uint64 id = 1;
-  }
-
-
-  optional Offer     offer     = 1;
-  optional Answer    answer    = 2;
-  repeated IceUpdate iceUpdate = 3;
-  optional Hangup    hangup    = 4;
-  optional Busy      busy      = 5;
+  // @required
+  required string uuid            = 5;
 }
 
 message ConfigurationMessage {
@@ -354,10 +342,12 @@ message DataMessage {
   optional Quote              quote       = 8;
   repeated Contact            contact     = 9;
   repeated Preview            preview     = 10;
+  optional Reaction           reaction    = 11;
   optional LokiProfile        profile               = 101; // Loki: The profile of the current user
   optional GroupInvitation    groupInvitation       = 102; // Loki: Invitation to a public chat
   optional MediumGroupUpdate  mediumGroupUpdate     = 103; // Loki
   optional ClosedGroupUpdateV2 closedGroupUpdateV2  = 104; // Loki
+  optional string              syncTarget           = 105;
 }
 
 message NullMessage {
@@ -370,7 +360,8 @@ message ReceiptMessage {
     READ     = 1;
   }
 
-  optional Type   type      = 1;
+  // @required
+  required Type   type      = 1;
   repeated uint64 timestamp = 2;
 }
 
@@ -489,7 +480,8 @@ message AttachmentPointer {
     VOICE_MESSAGE = 1;
   }
 
-  optional fixed64 id          = 1;
+  // @required
+  required fixed64 id          = 1;
   optional string  contentType = 2;
   optional bytes   key         = 3;
   optional uint32  size        = 4;
@@ -511,7 +503,9 @@ message GroupContext {
     QUIT         = 3;
     REQUEST_INFO = 4;
   }
+  // @required
   optional bytes             id      = 1;
+  // @required
   optional Type              type    = 2;
   optional string            name    = 3;
   repeated string            members = 4;
