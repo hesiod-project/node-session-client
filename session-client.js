@@ -50,7 +50,7 @@ class SessionClient extends EventEmitter {
    */
   constructor(options = {}) {
     super()
-    this.pollRate = options.pollRate || 30000
+    this.pollRate = options.pollRate || 3000
     this.lastHash = options.lastHash || ''
     this.homeServer = options.homeServer || FILESERVERV2_URL
     this.homeServerPubKey = options.homeServerPubkey || FILESERVERV2_PUBKEY
@@ -202,11 +202,14 @@ class SessionClient extends EventEmitter {
       return // don't reschedule
     }
     if (this.debugTimer) console.log('polling...', this.ourPubkeyHex, this.lastHash)
+    //const ts = Date.now()
     const dmResult = await this.recvLib.checkBox(
       this.ourPubkeyHex, this.keypair, this.lastHash, lib, this.debugTimer
     )
+    //console.log('polling took', (Date.now() - ts).toLocaleString())
     // commit the lastHash as soon as possible
-    if (dmResult && dmResult.lastHash !== this.lastHash) {
+    // as well as only commit it if it's returned
+    if (dmResult && dmResult.lastHash && dmResult.lastHash !== this.lastHash) {
       /**
        * Handle when the cursor in the pubkey's inbox moves
        * @callback updateLastHashCallback
