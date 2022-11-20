@@ -5,16 +5,21 @@ Supports
 - Session protocol support (Direct messaging)
 - Recovery Phrase (13 words)
 - Support for communicating with the Loki 10.x network
+- open groups v3
+  - receiving blinded public/open messages
+  - sending blinded public/open messages
+  - delete blinded public/open messages
+  - receiving blinded DMs (inbox)
 
 Working on:
 - LNS
-- open groups v3
 - file server v3
 - Avatars
 - Attachments
 - bugs / error codes
 - closed group support
 - relying on less 3rd party NPMs (for security reasons)
+- pure web version
 
 [Documentation](https://hesiod-project.github.io/node-session-client/)
 
