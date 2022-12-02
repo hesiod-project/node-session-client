@@ -10,6 +10,7 @@ Supports
   - sending blinded public/open messages
   - delete blinded public/open messages
   - receiving blinded DMs (inbox)
+  - display names
 
 Working on:
 - LNS
