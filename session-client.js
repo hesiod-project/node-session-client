@@ -621,6 +621,8 @@ class SessionClient extends EventEmitter {
     // returns false if can't get a token
     // get token, so we can get initial messages
     if (roomObj) {
+      // FIXME: avatar
+      if (this.displayName !== false) roomObj.updateProfile(this.displayName)
       roomObj.ensureToken()
     }
     // return handle
@@ -647,6 +649,8 @@ class SessionClient extends EventEmitter {
    * sessionClient.joinOpenGroup('chat.getsession.org')
    */
   async sendOpenGroupV3Message(roomObj, messageTextBody, options = {}) {
+    // FIXME: avatar
+    if (this.displayName !== false) roomObj.updateProfile(this.displayName)
     return roomObj.send(messageTextBody, options)
   }
 
