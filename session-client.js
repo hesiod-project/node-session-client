@@ -134,11 +134,15 @@ class SessionClient extends EventEmitter {
    * @public
    */
   async open() {
+    if (this.pollServer) {
+      console.warn('SessionClient - already opened')
+      return
+    }
     if (!this.ourPubkeyHex || this.ourPubkeyHex.length < 66) {
       console.error('no identity loaded')
       return
     }
-    //console.log('open - validated', this.ourPubkeyHex)
+    if (this.debugTimer) console.log(Date.now(), 'SessionClient::open - validated', this.ourPubkeyHex)
     // lazy load recv library
     if (!this.recvLib) {
       /**
@@ -198,14 +202,16 @@ class SessionClient extends EventEmitter {
   async poll() {
     // if closed
     if (!this.pollServer) {
-      if (this.debugTimer) console.log('closed...')
+      if (this.debugTimer) console.log(Date.now(), 'closed...')
       return // don't reschedule
     }
-    if (this.debugTimer) console.log('polling...', this.ourPubkeyHex, this.lastHash)
+    if (this.debugTimer) console.trace(Date.now(), 'polling...', this.ourPubkeyHex, this.lastHash)
     //const ts = Date.now()
     const dmResult = await this.recvLib.checkBox(
       this.ourPubkeyHex, this.keypair, this.lastHash, lib, this.debugTimer
     )
+    // dmResult being undefined usually means there was a network hiccup
+    //console.debug(Date.now(), 'SessionClient::poll - recvLib got', dmResult)
     //console.log('polling took', (Date.now() - ts).toLocaleString())
     // commit the lastHash as soon as possible
     // as well as only commit it if it's returned
@@ -238,7 +244,7 @@ class SessionClient extends EventEmitter {
     const newerGroupResults = [...v2GroupResults, ...v3GroupResults]
     //console.debug('newerGroupResults', newerGroupResults.length)
 
-    if (this.debugTimer) console.log('polled...', this.ourPubkeyHex)
+    if (this.debugTimer) console.log(Date.now(), 'polled...', this.ourPubkeyHex)
     if (dmResult || groupResults.length > 0 || newerGroupResults.length > 0) {
       const messages = newerGroupResults
       if (dmResult) {
@@ -261,44 +267,59 @@ class SessionClient extends EventEmitter {
             if (msg.messageRequestResponse) {
               // messageRequestResponse: { isApproved: true/false }
               // snodeExp/source/hash
+              /**
+               * Message Request Response message
+               * @event SessionClient#messageRequestResponse
+               * @type messageCallback
+               */
               this.emit('messageRequestResponse', msg)
+            } else
+            if (msg.unsendMessage) {
+              // when someone deletes a message
+              // msg: timestamp, author (sessionid)
+              /**
+               * Unsend message
+               * @event SessionClient#unsendMessage
+               * @type messageCallback
+               */
+              this.emit('unsendMessage', msg)
             } else
             if (msg.typingMessage) {
               // timestamp, action: 0
               // snodeExp/source
               //console.log('typingMessage', msg)
               /**
-                   * Typing message
-                   * @event SessionClient#typingMessage
-                   * @type messageCallback
-                   */
+               * Typing message
+               * @event SessionClient#typingMessage
+               * @type messageCallback
+               */
               this.emit('typingMessage', msg)
             } else
             if (msg.receiptMessage) {
               // msg.recieptMessage.timestamp is an array of unsigned protobuf longs..
               //console.log(msg.source, 'receiptMessage', msg.receiptMessage.type, msg.receiptMessage.timestamp, msg.snodeExp)
               /**
-                   * Read Receipt message
-                   * @event SessionClient#receiptMessage
-                   * @type messageCallback
-                   */
+               * Read Receipt message
+               * @event SessionClient#receiptMessage
+               * @type messageCallback
+               */
               this.emit('receiptMessage', msg)
             } else
             if (msg.configurationMessage) {
               /**
-                   * Multidevice config message
-                   * @event SessionClient#configurationMessage
-                   * @type messageCallback
-                   */
+               * Multidevice config message
+               * @event SessionClient#configurationMessage
+               * @type messageCallback
+               */
               this.emit('configurationMessage', msg)
             } else
             if (msg.nullMessage) {
               console.log('nullMessage', msg)
               /**
-                     * session established message
-                     * @event SessionClient#nullMessage
-                     * @type messageCallback
-                     */
+               * session established message
+               * @event SessionClient#nullMessage
+               * @type messageCallback
+               */
               this.emit('nullMessage', msg)
             } else {
               console.log('poll - unhandled message', msg)
@@ -339,9 +360,9 @@ class SessionClient extends EventEmitter {
       }
     }
     this.lastPoll = Date.now()
-    if (this.debugTimer) console.log('scheduled...')
+    if (this.debugTimer) console.log(Date.now(), 'scheduled...', this.pollRate + 'ms')
     setTimeout(() => {
-      if (this.debugTimer) console.log('firing...')
+      if (this.debugTimer) console.log(Date.now(), 'firing...')
       this.poll()
     }, this.pollRate)
   }
