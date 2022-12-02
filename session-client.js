@@ -629,7 +629,6 @@ class SessionClient extends EventEmitter {
     return roomObj
   }
 
-
   /**
    * Send Open Group V2 Message
    * @public
@@ -683,7 +682,6 @@ class SessionClient extends EventEmitter {
   deleteOpenGroupV3Message(roomObj, messageIds) {
     return this.deleteOpenGroupV2Message(roomObj, messageIds)
   }
-
 }
 
 module.exports = SessionClient
