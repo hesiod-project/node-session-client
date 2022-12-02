@@ -162,11 +162,15 @@ class SessionClient extends EventEmitter {
    * @public
    */
   async open() {
+    if (this.pollServer) {
+      console.warn('SessionClient - already opened')
+      return
+    }
     if (!this.ourPubkeyHex || this.ourPubkeyHex.length &lt; 66) {
       console.error('no identity loaded')
       return
     }
-    //console.log('open - validated', this.ourPubkeyHex)
+    if (this.debugTimer) console.log(Date.now(), 'SessionClient::open - validated', this.ourPubkeyHex)
     // lazy load recv library
     if (!this.recvLib) {
       /**
@@ -226,14 +230,16 @@ class SessionClient extends EventEmitter {
   async poll() {
     // if closed
     if (!this.pollServer) {
-      if (this.debugTimer) console.log('closed...')
+      if (this.debugTimer) console.log(Date.now(), 'closed...')
       return // don't reschedule
     }
-    if (this.debugTimer) console.log('polling...', this.ourPubkeyHex, this.lastHash)
+    if (this.debugTimer) console.trace(Date.now(), 'polling...', this.ourPubkeyHex, this.lastHash)
     //const ts = Date.now()
     const dmResult = await this.recvLib.checkBox(
       this.ourPubkeyHex, this.keypair, this.lastHash, lib, this.debugTimer
     )
+    // dmResult being undefined usually means there was a network hiccup
+    //console.debug(Date.now(), 'SessionClient::poll - recvLib got', dmResult)
     //console.log('polling took', (Date.now() - ts).toLocaleString())
     // commit the lastHash as soon as possible
     // as well as only commit it if it's returned
@@ -266,7 +272,7 @@ class SessionClient extends EventEmitter {
     const newerGroupResults = [...v2GroupResults, ...v3GroupResults]
     //console.debug('newerGroupResults', newerGroupResults.length)
 
-    if (this.debugTimer) console.log('polled...', this.ourPubkeyHex)
+    if (this.debugTimer) console.log(Date.now(), 'polled...', this.ourPubkeyHex)
     if (dmResult || groupResults.length > 0 || newerGroupResults.length > 0) {
       const messages = newerGroupResults
       if (dmResult) {
@@ -289,44 +295,59 @@ class SessionClient extends EventEmitter {
             if (msg.messageRequestResponse) {
               // messageRequestResponse: { isApproved: true/false }
               // snodeExp/source/hash
+              /**
+               * Message Request Response message
+               * @event SessionClient#messageRequestResponse
+               * @type messageCallback
+               */
               this.emit('messageRequestResponse', msg)
+            } else
+            if (msg.unsendMessage) {
+              // when someone deletes a message
+              // msg: timestamp, author (sessionid)
+              /**
+               * Unsend message
+               * @event SessionClient#unsendMessage
+               * @type messageCallback
+               */
+              this.emit('unsendMessage', msg)
             } else
             if (msg.typingMessage) {
               // timestamp, action: 0
               // snodeExp/source
               //console.log('typingMessage', msg)
               /**
-                   * Typing message
-                   * @event SessionClient#typingMessage
-                   * @type messageCallback
-                   */
+               * Typing message
+               * @event SessionClient#typingMessage
+               * @type messageCallback
+               */
               this.emit('typingMessage', msg)
             } else
             if (msg.receiptMessage) {
               // msg.recieptMessage.timestamp is an array of unsigned protobuf longs..
               //console.log(msg.source, 'receiptMessage', msg.receiptMessage.type, msg.receiptMessage.timestamp, msg.snodeExp)
               /**
-                   * Read Receipt message
-                   * @event SessionClient#receiptMessage
-                   * @type messageCallback
-                   */
+               * Read Receipt message
+               * @event SessionClient#receiptMessage
+               * @type messageCallback
+               */
               this.emit('receiptMessage', msg)
             } else
             if (msg.configurationMessage) {
               /**
-                   * Multidevice config message
-                   * @event SessionClient#configurationMessage
-                   * @type messageCallback
-                   */
+               * Multidevice config message
+               * @event SessionClient#configurationMessage
+               * @type messageCallback
+               */
               this.emit('configurationMessage', msg)
             } else
             if (msg.nullMessage) {
               console.log('nullMessage', msg)
               /**
-                     * session established message
-                     * @event SessionClient#nullMessage
-                     * @type messageCallback
-                     */
+               * session established message
+               * @event SessionClient#nullMessage
+               * @type messageCallback
+               */
               this.emit('nullMessage', msg)
             } else {
               console.log('poll - unhandled message', msg)
@@ -367,9 +388,9 @@ class SessionClient extends EventEmitter {
       }
     }
     this.lastPoll = Date.now()
-    if (this.debugTimer) console.log('scheduled...')
+    if (this.debugTimer) console.log(Date.now(), 'scheduled...', this.pollRate + 'ms')
     setTimeout(() => {
-      if (this.debugTimer) console.log('firing...')
+      if (this.debugTimer) console.log(Date.now(), 'firing...')
       this.poll()
     }, this.pollRate)
   }
@@ -628,12 +649,13 @@ class SessionClient extends EventEmitter {
     // returns false if can't get a token
     // get token, so we can get initial messages
     if (roomObj) {
+      // FIXME: avatar
+      if (this.displayName !== false) roomObj.updateProfile(this.displayName)
       roomObj.ensureToken()
     }
     // return handle
     return roomObj
   }
-
 
   /**
    * Send Open Group V2 Message
@@ -654,6 +676,8 @@ class SessionClient extends EventEmitter {
    * sessionClient.joinOpenGroup('chat.getsession.org')
    */
   async sendOpenGroupV3Message(roomObj, messageTextBody, options = {}) {
+    // FIXME: avatar
+    if (this.displayName !== false) roomObj.updateProfile(this.displayName)
     return roomObj.send(messageTextBody, options)
   }
 
@@ -686,7 +710,6 @@ class SessionClient extends EventEmitter {
   deleteOpenGroupV3Message(roomObj, messageIds) {
     return this.deleteOpenGroupV2Message(roomObj, messageIds)
   }
-
 }
 
 module.exports = SessionClient
@@ -700,13 +723,13 @@ module.exports = SessionClient
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-lns.html">lns</a></li><li><a href="module-session-client.html">session-client</a></li></ul><h3>Classes</h3><ul><li><a href="module-session-client-SessionClient.html">SessionClient</a></li></ul><h3>Events</h3><ul><li><a href="SessionClient.html#event:configurationMessage">configurationMessage</a></li><li><a href="SessionClient.html#event:messages">messages</a></li><li><a href="SessionClient.html#event:nullMessage">nullMessage</a></li><li><a href="SessionClient.html#event:receiptMessage">receiptMessage</a></li><li><a href="SessionClient.html#event:typingMessage">typingMessage</a></li><li><a href="SessionClient.html#event:updateLastHash">updateLastHash</a></li></ul><h3>Global</h3><ul><li><a href="global.html#FILESERVERV2_URL">FILESERVERV2_URL</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-lns.html">lns</a></li><li><a href="module-session-client.html">session-client</a></li></ul><h3>Classes</h3><ul><li><a href="module-session-client-SessionClient.html">SessionClient</a></li></ul><h3>Events</h3><ul><li><a href="SessionClient.html#event:configurationMessage">configurationMessage</a></li><li><a href="SessionClient.html#event:messageRequestResponse">messageRequestResponse</a></li><li><a href="SessionClient.html#event:messages">messages</a></li><li><a href="SessionClient.html#event:nullMessage">nullMessage</a></li><li><a href="SessionClient.html#event:receiptMessage">receiptMessage</a></li><li><a href="SessionClient.html#event:typingMessage">typingMessage</a></li><li><a href="SessionClient.html#event:unsendMessage">unsendMessage</a></li><li><a href="SessionClient.html#event:updateLastHash">updateLastHash</a></li></ul><h3>Global</h3><ul><li><a href="global.html#FILESERVERV2_URL">FILESERVERV2_URL</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.6</a> on Sun Nov 20 2022 09:24:03 GMT+0000 (Coordinated Universal Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.6</a> on Fri Dec 02 2022 07:30:56 GMT+0000 (Coordinated Universal Time)
 </footer>
 
 <script> prettyPrint(); </script>
