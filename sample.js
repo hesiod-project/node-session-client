@@ -105,5 +105,4 @@ client.loadIdentity({
       await client.deleteOpenGroupV2Message(ogv2Handle, messageId)
     }
   }
-
 })
