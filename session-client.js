@@ -256,7 +256,8 @@ class SessionClient extends EventEmitter {
             // separate out simple messages to make it easier
             if (msg.dataMessage && (msg.dataMessage.body || msg.dataMessage.attachments)) {
               // maybe there will be something here...
-              //console.log('pool dataMessage', msg)
+              //console.log('pool dataMessage', msg.dataMessage)
+              //console.log('DM attachments', msg.dataMessage.attachments)
               // skip session resets
               // desktop: msg.dataMessage.body === 'TERMINATE' &&
               if (!(msg.flags === 1)) { // END_SESSION
@@ -438,7 +439,11 @@ class SessionClient extends EventEmitter {
    * @return {Promise<Object>} returns an attachmentPointer
    */
   async makeImageAttachment(data) {
-    return attachemntUtils.uploadEncryptedAttachment(this.homeServer, data)
+    if (data === undefined) {
+      console.trace('SessionClient::makeImageAttachment - params passed is undefined')
+      return
+    }
+    return attachemntUtils.uploadEncryptedAttachment(this.homeServer, this.homeServerPubKey, data)
   }
 
   /**
@@ -507,6 +512,7 @@ class SessionClient extends EventEmitter {
         url: this.encAvatarUrl,
         profileKeyBuf: this.profileKeyBuf
       }
+      //console.log('session-client::send - inserting avatar info', sendOptions)
     }
     try {
       return this.sendLib.send(destination, this.keypair, messageTextBody, lib, sendOptions)
