@@ -55,7 +55,9 @@ client.loadIdentity({
         if (msg.attachments.length) {
           const attachments = await client.getAttachments(msg)
           //console.log('attachment', attachments[0])
-          fs.writeFileSync(msg.source + '.attachment', attachments[0])
+          if (attachments[0]) { // if no errors
+            fs.writeFileSync(msg.source + '.attachment', attachments[0])
+          }
         }
       }
       /*
