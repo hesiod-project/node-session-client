@@ -426,6 +426,7 @@ class SessionClient extends EventEmitter {
       // could check digest too (should do that inside decryptCBC tho)
       // hack around session support for multiple servers
       const options = { pubkey: this.homeServerPubKey }
+      // downloadEncryptedAttachment should return a buffer
       const res = await attachemntUtils.downloadEncryptedAttachment(attachment.url, attachment.key, options)
       //console.log('attachmentRes', res)
       return res
