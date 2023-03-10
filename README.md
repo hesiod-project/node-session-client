@@ -22,12 +22,70 @@ Working on:
 - relying on less 3rd party NPMs (for security reasons)
 - pure web version
 
-[Documentation](https://hesiod-project.github.io/node-session-client/)
+## installing nodejs
+
+### CentOS NodeJS installation:
+
+`curl -sL https://rpm.nodesource.com/setup_18.x | sudo bash -`
+
+### Ubuntu/Debian NodeJS installation:
+
+`curl -sL https://deb.nodesource.com/setup_18.x | sudo bash -`
+
+then
+
+`sudo apt-get install -y nodejs`
+
+## install dependencies
+
+from inside the project root directory
+
+`npm i`
+
+## Example Usage
+
+1. set up library instance, be sure to adjust path in require if not in the project root.
+
+```js
+const SessionClient = require('./session-client.js')
+
+// You'll want an instance per SessionID you want to receive messages for
+const client = new SessionClient()
+```
+
+2. Set up identity and send a message
+
+To generate a new identity and save it to disk as `seed.txt`. please change `YOUR_SESSON_ID_GOES_HERE` to your Session ID
+
+```js
+const fs = require('fs')
+client.loadIdentity({
+  seed: fs.existsSync('seed.txt') && fs.readFileSync('seed.txt').toString(),
+  displayName: 'Sample Session Client',
+}).then(async () => {
+  // output recovery phrase if making an identity
+  console.log(client.identityOutput)
+  
+  const SessionID = "YOUR_SESSON_ID_GOES_HERE"
+  client.send(SessionID, 'Hello').then(() => {
+     console.debug('Sent "Hello" to', SessionID)
+  })
+})
+```
+
+## Detailed Example
 
 [Example](sample.js)
+
+## Documentation
+
+[Auto-generated Detailed Documentation](https://hesiod-project.github.io/node-session-client/)
+
+
+# Support our work
 
 Development depends on your support
 LT2mP2DrmGD82gFnH16ty8ZtP6f33czpA6XgQdnuTVeT5bNGyy3vnaUezzKq1rEYyq3cvb2GBZ5LjCC6uqDyKnbvFki9aAX
 
 QR Code:
-![LT2mP2DrmGD82gFnH16ty8ZtP6f33czpA6XgQdnuTVeT5bNGyy3vnaUezzKq1rEYyq3cvb2GBZ5LjCC6uqDyKnbvFki9aAX](LT2mP2DrmGD82gFnH16ty8ZtP6f33czpA6XgQdnuTVeT5bNGyy3vnaUezzKq1rEYyq3cvb2GBZ5LjCC6uqDyKnbvFki9aAX.png)
+![oxen://LT2mP2DrmGD82gFnH16ty8ZtP6f33czpA6XgQdnuTVeT5bNGyy3vnaUezzKq1rEYyq3cvb2GBZ5LjCC6uqDyKnbvFki9aAX](LT2mP2DrmGD82gFnH16ty8ZtP6f33czpA6XgQdnuTVeT5bNGyy3vnaUezzKq1rEYyq3cvb2GBZ5LjCC6uqDyKnbvFki9aAX.png)
