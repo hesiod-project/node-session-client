@@ -36,6 +36,18 @@ then
 
 `sudo apt-get install -y nodejs`
 
+## clone repo
+
+You can clone the repo many ways. I will include how to do this from the command line:
+
+This makes a local copy of the repo via https
+
+`git clone https://github.com/hesiod-project/node-session-client`
+
+Be sure to be inside of the project repo for the next steps
+
+`cd node-session-client`
+
 ## install dependencies
 
 from inside the project root directory
